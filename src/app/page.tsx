@@ -1,65 +1,15 @@
-import Image from "next/image";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { ArrowRight, FileText, Plus, ShieldCheck } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
 
-export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+export default async function Home() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  const { data: memberships } = await supabase.from("organization_members").select("organization_id, organizations(name)").eq("user_id", user.id);
+  const { data: roles } = await supabase.from("team_roles").select("id, title, seniority_hint, status, updated_at, teams(name, organizations(name))").order("updated_at", { ascending: false }).limit(12);
+  const hasOrganization = (memberships?.length ?? 0) > 0;
+
+  return <main className="min-h-screen bg-slate-50"><header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8"><div><p className="text-lg font-black tracking-tight text-slate-950">NCS JD Operator</p><p className="text-xs text-slate-400">근거 기반 직무기술서</p></div><Link href="/admin" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-900"><ShieldCheck className="h-4 w-4" />관리</Link></div></header><div className="mx-auto max-w-6xl px-5 py-10 sm:px-8"><section className="flex flex-col justify-between gap-6 rounded-3xl bg-slate-950 p-8 text-white sm:flex-row sm:items-end sm:p-10"><div><p className="text-sm font-semibold text-blue-300">Job Architecture Workspace</p><h1 className="mt-3 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">조직의 역할을 명확한 직무기술서로 설계하세요.</h1><p className="mt-4 max-w-xl text-sm leading-6 text-slate-300">직무 미션과 책임을 구조화하고 NCS 능력단위를 근거로 연결합니다.</p></div>{hasOrganization && <Link href="/jobs/new" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500"><Plus className="h-4 w-4" />새 JD 만들기</Link>}</section>{!hasOrganization ? <section className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-6"><h2 className="font-bold text-amber-900">소속 조직이 없습니다</h2><p className="mt-2 text-sm text-amber-700">관리자가 발급한 초대 링크를 통해 조직에 먼저 연결해 주세요.</p></section> : <section className="mt-10"><div className="flex items-end justify-between"><div><p className="text-sm font-semibold text-blue-600">Recent drafts</p><h2 className="mt-1 text-2xl font-bold text-slate-950">최근 직무기술서</h2></div></div>{(roles?.length ?? 0) === 0 ? <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center"><FileText className="mx-auto h-8 w-8 text-slate-300" /><h3 className="mt-4 font-bold text-slate-800">아직 만든 JD가 없습니다</h3><p className="mt-2 text-sm text-slate-400">첫 직무의 미션과 책임을 입력해 보세요.</p><Link href="/jobs/new" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-blue-600">첫 JD 만들기<ArrowRight className="h-4 w-4" /></Link></div> : <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{roles?.map((role) => <Link key={role.id} href={`/jobs/${role.id}`} className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"><div className="flex items-center justify-between"><span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">{role.status === "draft" ? "초안" : role.status}</span><ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-1 group-hover:text-blue-500" /></div><h3 className="mt-4 text-lg font-bold text-slate-900">{role.title}</h3><p className="mt-1 text-sm text-slate-400">{role.teams?.organizations?.name} · {role.teams?.name}</p>{role.seniority_hint && <p className="mt-4 text-xs font-medium text-slate-500">{role.seniority_hint}</p>}</Link>)}</div>}</section>}</div></main>;
 }
