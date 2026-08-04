@@ -8,6 +8,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 이 프로젝트는 여러 에이전트(Codex, Claude Code 등)가 서로 다른 세션에서 번갈아 작업합니다. 컨텍스트 단절 없이 이어받기 위해 `docs/HANDOFF_*.md` 문서로 인수인계합니다.
 
+사용자가 `/인수` 또는 `/인계`라고만 말해도 아래 절차를 그대로 수행한다 (Claude Code에서는 `.claude/commands/인수.md`, `.claude/commands/인계.md`로 등록되어 있음. Codex 등 다른 도구에는 이 슬래시 명령이 없을 수 있으니, 그럴 땐 이 섹션의 절차를 직접 따른다):
+- `/인수` = 세션 시작 시 절차 (최신 인수인계서 읽고 상태 파악)
+- `/인계` = 세션 종료 시 절차 (인수인계서 새로 작성)
+
 ## 세션 시작 시
 1. `docs/` 안에서 파일명 날짜가 가장 최신인 `HANDOFF_YYYYMMDD.md`를 찾아 전체를 읽는다.
 2. 거기 적힌 "미해결 과제"와 "주의사항"을 먼저 확인한 뒤 작업을 시작한다.
