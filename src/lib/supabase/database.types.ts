@@ -101,36 +101,99 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          design_snapshot: Json
           id: string
+          organization_profile_id: string | null
+          revision_kind: string
           source: Database["public"]["Enums"]["evidence_source"]
           status: Database["public"]["Enums"]["jd_status"]
           team_role_id: string
+          version_major: number
+          version_minor: number
           version_no: number
         }
         Insert: {
           created_at?: string
           created_by?: string | null
+          design_snapshot?: Json
           id?: string
+          organization_profile_id?: string | null
+          revision_kind?: string
           source?: Database["public"]["Enums"]["evidence_source"]
           status?: Database["public"]["Enums"]["jd_status"]
           team_role_id: string
+          version_major?: number
+          version_minor?: number
           version_no: number
         }
         Update: {
           created_at?: string
           created_by?: string | null
+          design_snapshot?: Json
           id?: string
+          organization_profile_id?: string | null
+          revision_kind?: string
           source?: Database["public"]["Enums"]["evidence_source"]
           status?: Database["public"]["Enums"]["jd_status"]
           team_role_id?: string
+          version_major?: number
+          version_minor?: number
           version_no?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "jd_versions_organization_profile_id_fkey"
+            columns: ["organization_profile_id"]
+            isOneToOne: false
+            referencedRelation: "organization_profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "jd_versions_team_role_id_fkey"
             columns: ["team_role_id"]
             isOneToOne: false
             referencedRelation: "team_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jd_validation_runs: {
+        Row: {
+          coverage_score: number
+          created_at: string
+          findings: Json
+          id: string
+          jd_version_id: string
+          model: string
+          status: string
+          summary: string
+        }
+        Insert: {
+          coverage_score?: number
+          created_at?: string
+          findings?: Json
+          id?: string
+          jd_version_id: string
+          model?: string
+          status: string
+          summary: string
+        }
+        Update: {
+          coverage_score?: number
+          created_at?: string
+          findings?: Json
+          id?: string
+          jd_version_id?: string
+          model?: string
+          status?: string
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jd_validation_runs_jd_version_id_fkey"
+            columns: ["jd_version_id"]
+            isOneToOne: false
+            referencedRelation: "jd_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -253,6 +316,97 @@ export type Database = {
           },
         ]
       }
+      organization_profiles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          model: string
+          organization_id: string
+          source_ids: string[]
+          structured_context: Json
+          summary: string
+          version_no: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          model?: string
+          organization_id: string
+          source_ids?: string[]
+          structured_context?: Json
+          summary: string
+          version_no: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          model?: string
+          organization_id?: string
+          source_ids?: string[]
+          structured_context?: Json
+          summary?: string
+          version_no?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_sources: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          organization_id: string
+          raw_text: string | null
+          source_type: string
+          storage_path: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          organization_id: string
+          raw_text?: string | null
+          source_type: string
+          storage_path?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          organization_id?: string
+          raw_text?: string | null
+          source_type?: string
+          storage_path?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_sources_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string
@@ -320,6 +474,70 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      role_ncs_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          jd_version_id: string
+          match_strength: string
+          matched_inputs: Json
+          model: string
+          ncs_competency_unit_id: string
+          rationale: string
+          status: string
+          team_role_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          jd_version_id: string
+          match_strength?: string
+          matched_inputs?: Json
+          model?: string
+          ncs_competency_unit_id: string
+          rationale: string
+          status?: string
+          team_role_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          jd_version_id?: string
+          match_strength?: string
+          matched_inputs?: Json
+          model?: string
+          ncs_competency_unit_id?: string
+          rationale?: string
+          status?: string
+          team_role_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_ncs_mappings_jd_version_id_fkey"
+            columns: ["jd_version_id"]
+            isOneToOne: false
+            referencedRelation: "jd_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_ncs_mappings_ncs_competency_unit_id_fkey"
+            columns: ["ncs_competency_unit_id"]
+            isOneToOne: false
+            referencedRelation: "ncs_competency_units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_ncs_mappings_team_role_id_fkey"
+            columns: ["team_role_id"]
+            isOneToOne: false
+            referencedRelation: "team_roles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       team_roles: {
         Row: {

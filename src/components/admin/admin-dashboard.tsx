@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Copy, Check, Ban } from "lucide-react";
+import { Plus, Copy, Check, Ban, ArrowRight, Building2, LoaderCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface Invite {
@@ -31,12 +31,21 @@ function slugify(name: string) {
   return slug || `org-${Date.now()}`;
 }
 
-export function AdminDashboard({ initialOrganizations }: { initialOrganizations: Organization[] }) {
+export function AdminDashboard({
+  initialOrganizations,
+  memberOrganizationIds,
+  isSuperAdmin,
+}: {
+  initialOrganizations: Organization[];
+  memberOrganizationIds: string[];
+  isSuperAdmin: boolean;
+}) {
   const router = useRouter();
   const [newOrgName, setNewOrgName] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [connectingOrgId, setConnectingOrgId] = useState<string | null>(null);
 
   async function handleCreateOrg(e: React.FormEvent) {
     e.preventDefault();
@@ -84,10 +93,38 @@ export function AdminDashboard({ initialOrganizations }: { initialOrganizations:
     router.refresh();
   }
 
+  async function openWorkspace(org: Organization) {
+    if (isSuperAdmin || memberOrganizationIds.includes(org.id)) {
+      router.push("/");
+      return;
+    }
+
+    const activeInvite = org.organization_invites.find((invite) => {
+      const expired = invite.expires_at ? new Date(invite.expires_at) <= new Date() : false;
+      return !invite.is_revoked && !expired;
+    });
+    if (!activeInvite) {
+      setError("활성 초대 링크를 먼저 만들어 주세요.");
+      return;
+    }
+
+    setConnectingOrgId(org.id);
+    setError(null);
+    const supabase = createClient();
+    const { error } = await supabase.rpc("accept_invite", { invite_token: activeInvite.token });
+    setConnectingOrgId(null);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    router.push("/");
+    router.refresh();
+  }
+
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
       <h1 className="text-2xl font-bold text-slate-900">마스터 관리자</h1>
-      <p className="mt-1 text-sm text-slate-500">회사를 만들고, 초대 링크로 계정을 연결하세요.</p>
+      <p className="mt-1 text-sm text-slate-500">회사를 만들고, 초대 링크 또는 작업 공간 연결로 운영을 시작하세요.</p>
 
       <form onSubmit={handleCreateOrg} className="mt-8 flex gap-2">
         <input
@@ -116,16 +153,31 @@ export function AdminDashboard({ initialOrganizations }: { initialOrganizations:
         {initialOrganizations.map((org) => (
           <div key={org.id} className="rounded-xl border border-slate-200 p-5">
             <div className="flex items-center justify-between">
-              <div>
-                <h2 className="font-semibold text-slate-900">{org.name}</h2>
-                <p className="text-xs text-slate-400">{org.slug}</p>
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-600">
+                  <Building2 className="h-5 w-5" />
+                </span>
+                <div>
+                  <h2 className="font-semibold text-slate-900">{org.name}</h2>
+                  <p className="text-xs text-slate-400">{org.slug}</p>
+                </div>
               </div>
-              <button
-                onClick={() => handleCreateInvite(org.id)}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-              >
-                초대 링크 만들기
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleCreateInvite(org.id)}
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  초대 링크 만들기
+                </button>
+                <button
+                  onClick={() => openWorkspace(org)}
+                  disabled={connectingOrgId === org.id}
+                  className="flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {connectingOrgId === org.id ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
+                  {isSuperAdmin || memberOrganizationIds.includes(org.id) ? "작업 공간 열기" : "내 계정 연결"}
+                </button>
+              </div>
             </div>
 
             {org.organization_invites.length > 0 && (

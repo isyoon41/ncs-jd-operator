@@ -20,5 +20,16 @@ export default async function AdminPage() {
     )
     .order("created_at", { ascending: false });
 
-  return <AdminDashboard initialOrganizations={organizations ?? []} />;
+  const { data: memberships } = await supabase
+    .from("organization_members")
+    .select("organization_id")
+    .eq("user_id", user.id);
+
+  return (
+    <AdminDashboard
+      initialOrganizations={organizations ?? []}
+      memberOrganizationIds={(memberships ?? []).map((item) => item.organization_id)}
+      isSuperAdmin={Boolean(isAdmin)}
+    />
+  );
 }

@@ -1,0 +1,485 @@
+import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/database.types";
+
+export const GEMINI_MODEL = "gemini-3.6-flash";
+
+export type CompanyContext = {
+  summary: string;
+  businessAreas: string[];
+  productsServices: string[];
+  customers: string[];
+  businessModel: string;
+  growthStage: string;
+  strategicPriorities: string[];
+  culture: string[];
+  keyTerms: string[];
+  uncertainties: string[];
+};
+
+export type NcsSearchPlan = {
+  majorCodes: string[];
+  searchTerms: string[];
+  rationale: string;
+};
+
+export type NcsCandidate = {
+  id: string;
+  ncsCode: string;
+  name: string;
+  level: string | null;
+  definition: string | null;
+  lclasName: string | null;
+  mclasName: string | null;
+  sclasName: string | null;
+  subdName: string | null;
+};
+
+export type GroundedItem = {
+  content: string;
+  ncsCodes: string[];
+  basis: "company" | "team_input" | "ncs" | "ai_inference";
+};
+
+export type TeamDesign = {
+  teamMission: string;
+  teamOutputs: string[];
+  teamResponsibilities: string[];
+  stakeholders: string[];
+  suggestedRoles: Array<{ title: string; purpose: string }>;
+  primaryRole: {
+    title: string;
+    mission: string;
+    outputs: string[];
+    responsibilities: GroundedItem[];
+    requiredQualifications: GroundedItem[];
+    preferredQualifications: GroundedItem[];
+    tools: string[];
+    stakeholders: string[];
+    kpis: Array<{
+      name: string;
+      measure: string;
+      cadence: string;
+      targetGuide: string;
+      rationale: string;
+    }>;
+  };
+  ncsMappings: Array<{
+    ncsCode: string;
+    rationale: string;
+    matchStrength: "high" | "medium" | "low";
+    matchedInputs: string[];
+  }>;
+};
+
+export type ValidationResult = {
+  status: "passed" | "passed_with_notes" | "needs_review";
+  coverageScore: number;
+  summary: string;
+  findings: Array<{
+    severity: "info" | "warning" | "critical";
+    category: string;
+    message: string;
+  }>;
+  design: TeamDesign;
+};
+
+type GeminiPart =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } };
+
+const stringArray = (value: unknown, max = 12) =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim()).slice(0, max)
+    : [];
+
+const textValue = (value: unknown, fallback = "") =>
+  typeof value === "string" && value.trim() ? value.trim() : fallback;
+
+async function generateStructured<T>(parts: GeminiPart[], schema: object, operation: string): Promise<T> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY가 설정되지 않았습니다.");
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: schema,
+          maxOutputTokens: 8192,
+        },
+      }),
+      signal: AbortSignal.timeout(90_000),
+    },
+  );
+  if (!response.ok) {
+    const payload = await response.text();
+    throw new Error(`${operation} Gemini 요청 실패(${response.status}): ${payload.slice(0, 240)}`);
+  }
+  const payload = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+  const text = payload.candidates?.[0]?.content?.parts?.find((part) => part.text)?.text;
+  if (!text) throw new Error("Gemini가 구조화된 결과를 반환하지 않았습니다.");
+  return JSON.parse(text) as T;
+}
+
+const companySchema = {
+  type: "OBJECT",
+  properties: {
+    summary: { type: "STRING" },
+    businessAreas: { type: "ARRAY", items: { type: "STRING" }, maxItems: 8 },
+    productsServices: { type: "ARRAY", items: { type: "STRING" }, maxItems: 10 },
+    customers: { type: "ARRAY", items: { type: "STRING" }, maxItems: 8 },
+    businessModel: { type: "STRING" },
+    growthStage: { type: "STRING" },
+    strategicPriorities: { type: "ARRAY", items: { type: "STRING" }, maxItems: 8 },
+    culture: { type: "ARRAY", items: { type: "STRING" }, maxItems: 8 },
+    keyTerms: { type: "ARRAY", items: { type: "STRING" }, maxItems: 16 },
+    uncertainties: { type: "ARRAY", items: { type: "STRING" }, maxItems: 8 },
+  },
+  required: ["summary", "businessAreas", "productsServices", "customers", "businessModel", "growthStage", "strategicPriorities", "culture", "keyTerms", "uncertainties"],
+} as const;
+
+export async function analyzeCompanyContext(input: {
+  organizationName: string;
+  introduction: string;
+  file: File | null;
+}): Promise<CompanyContext> {
+  const prompt = `당신은 스타트업 조직설계 컨설턴트입니다. 제공된 회사 소개 또는 IR 자료에서 확인 가능한 사실만 추출하여 회사 프로필을 만드세요.
+
+[회사명]
+${input.organizationName}
+
+[사용자 직접 입력]
+${input.introduction || "없음"}
+
+[원칙]
+- 자료에 없는 사실은 만들지 말고 uncertainties에 기록하세요.
+- 채용 홍보 문구가 아니라 팀과 직무를 설계하는 데 필요한 사업 맥락을 정리하세요.
+- 고유명사, 제품명, 고객군, 규제·기술 용어는 keyTerms에 보존하세요.
+- 결과는 지정된 JSON 스키마만 따르세요.`;
+  const parts: GeminiPart[] = [{ text: prompt }];
+  if (input.file) {
+    if (input.file.type === "application/pdf") {
+      const data = Buffer.from(await input.file.arrayBuffer()).toString("base64");
+      parts.push({ inlineData: { mimeType: "application/pdf", data } });
+    } else {
+      const fileText = (await input.file.text()).slice(0, 120_000);
+      parts.push({ text: `[업로드 파일: ${input.file.name}]\n${fileText}` });
+    }
+  }
+  const raw = await generateStructured<Record<string, unknown>>(parts, companySchema, "회사 프로필 분석");
+  return {
+    summary: textValue(raw.summary, input.introduction || `${input.organizationName} 회사 프로필`),
+    businessAreas: stringArray(raw.businessAreas, 8),
+    productsServices: stringArray(raw.productsServices, 10),
+    customers: stringArray(raw.customers, 8),
+    businessModel: textValue(raw.businessModel, "자료에서 확인되지 않음"),
+    growthStage: textValue(raw.growthStage, "자료에서 확인되지 않음"),
+    strategicPriorities: stringArray(raw.strategicPriorities, 8),
+    culture: stringArray(raw.culture, 8),
+    keyTerms: stringArray(raw.keyTerms, 16),
+    uncertainties: stringArray(raw.uncertainties, 8),
+  };
+}
+
+const ncsPlanSchema = {
+  type: "OBJECT",
+  properties: {
+    majorCodes: { type: "ARRAY", items: { type: "STRING" }, maxItems: 4 },
+    searchTerms: { type: "ARRAY", items: { type: "STRING" }, maxItems: 14 },
+    rationale: { type: "STRING" },
+  },
+  required: ["majorCodes", "searchTerms", "rationale"],
+} as const;
+
+const ncsMajorClasses = `01 사업관리, 02 경영·회계·사무, 03 금융·보험, 04 교육·자연·사회과학, 05 법률·경찰·소방·교도·국방, 06 보건·의료, 07 사회복지·종교, 08 문화·예술·디자인·방송, 09 운전·운송, 10 영업판매, 11 경비·청소, 12 이용·숙박·여행·오락·스포츠, 13 음식서비스, 14 건설, 15 기계, 16 재료, 17 화학·바이오, 18 섬유·의복, 19 전기·전자, 20 정보통신, 21 식품가공, 22 인쇄·목재·가구·공예, 23 환경·에너지·안전, 24 농림어업`;
+
+export async function planNcsSearch(input: {
+  company: CompanyContext;
+  teamName: string;
+  teamRole: string;
+  roleTitleHint: string | null;
+  additionalContext?: string;
+}): Promise<NcsSearchPlan> {
+  const prompt = `회사와 팀 맥락을 근거로 한국 NCS 능력단위를 내부 검색하기 위한 계획을 만드세요.
+
+[NCS 대분류]
+${ncsMajorClasses}
+
+[회사 프로필]
+${JSON.stringify(input.company)}
+
+[팀]
+팀명: ${input.teamName}
+팀 역할: ${input.teamRole}
+직무명 힌트: ${input.roleTitleHint ?? "없음"}
+추가 맥락: ${input.additionalContext ?? "없음"}
+
+[원칙]
+- majorCodes에는 실제 관련성이 높은 대분류 코드만 넣으세요.
+- searchTerms는 '관리', '운영', '분석'처럼 너무 일반적인 단어보다 NCS 능력단위명에 등장할 구체적인 직무·과업 표현을 사용하세요.
+- 회사 산업과 무관한 분야를 넓게 포함하지 마세요.`;
+  const raw = await generateStructured<Record<string, unknown>>([{ text: prompt }], ncsPlanSchema, "NCS 검색계획 생성");
+  return {
+    majorCodes: stringArray(raw.majorCodes, 4).filter((code) => /^\d{2}$/.test(code)),
+    searchTerms: stringArray(raw.searchTerms, 14),
+    rationale: textValue(raw.rationale),
+  };
+}
+
+export async function retrieveNcsCandidates(
+  supabase: SupabaseClient<Database>,
+  plan: NcsSearchPlan,
+): Promise<NcsCandidate[]> {
+  const responses = await Promise.all(
+    plan.searchTerms.map((term) =>
+      supabase
+        .from("ncs_competency_units")
+        .select("id, ncs_code, name, level, definition, lclas_name, mclas_name, sclas_name, subd_name")
+        .ilike("name", `%${term}%`)
+        .limit(20),
+    ),
+  );
+  const unique = new Map<string, NcsCandidate>();
+  responses.forEach(({ data }) => data?.forEach((unit) => unique.set(unit.id, {
+    id: unit.id,
+    ncsCode: unit.ncs_code,
+    name: unit.name,
+    level: unit.level,
+    definition: unit.definition,
+    lclasName: unit.lclas_name,
+    mclasName: unit.mclas_name,
+    sclasName: unit.sclas_name,
+    subdName: unit.subd_name,
+  })));
+  const candidates = [...unique.values()];
+  const scoped = plan.majorCodes.length > 0
+    ? candidates.filter((unit) => plan.majorCodes.some((code) => unit.ncsCode.startsWith(code)))
+    : candidates;
+  return (scoped.length >= 5 ? scoped : candidates).slice(0, 50);
+}
+
+const encodedPayloadSchema = {
+  type: "OBJECT",
+  properties: {
+    payload: { type: "STRING" },
+  },
+  required: ["payload"],
+} as const;
+
+function parseEncodedPayload(raw: Record<string, unknown>, operation: string): Record<string, unknown> {
+  const payload = textValue(raw.payload);
+  if (!payload) throw new Error(`${operation} 결과에 payload가 없습니다.`);
+  try {
+    const parsed = JSON.parse(payload) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // The error below gives the user an operation-specific message.
+  }
+  throw new Error(`${operation} 결과의 내부 JSON을 해석하지 못했습니다.`);
+}
+
+function normalizeGroundedItems(value: unknown, allowedCodes: Set<string>, fallback: GroundedItem[]): GroundedItem[] {
+  if (!Array.isArray(value)) return fallback;
+  const items = value.flatMap((item): GroundedItem[] => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const content = textValue(record.content);
+    if (!content) return [];
+    const basisValue = textValue(record.basis);
+    const basis: GroundedItem["basis"] = ["company", "team_input", "ncs", "ai_inference"].includes(basisValue)
+      ? basisValue as GroundedItem["basis"]
+      : "ai_inference";
+    return [{ content, ncsCodes: stringArray(record.ncsCodes, 3).filter((code) => allowedCodes.has(code)), basis }];
+  });
+  return items.length > 0 ? items : fallback;
+}
+
+function normalizeDesign(raw: Record<string, unknown>, input: {
+  teamName: string;
+  teamRole: string;
+  roleTitleHint: string | null;
+  candidates: NcsCandidate[];
+}): TeamDesign {
+  const allowedCodes = new Set(input.candidates.map((item) => item.ncsCode));
+  const primary = raw.primaryRole && typeof raw.primaryRole === "object" ? raw.primaryRole as Record<string, unknown> : {};
+  const fallbackResponsibility: GroundedItem = { content: input.teamRole, ncsCodes: [], basis: "team_input" };
+  const mappings = Array.isArray(raw.ncsMappings) ? raw.ncsMappings.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const ncsCode = textValue(record.ncsCode);
+    if (!allowedCodes.has(ncsCode)) return [];
+    const strengthValue = textValue(record.matchStrength);
+    const matchStrength: "high" | "medium" | "low" = ["high", "medium", "low"].includes(strengthValue)
+      ? strengthValue as "high" | "medium" | "low"
+      : "medium";
+    return [{ ncsCode, rationale: textValue(record.rationale), matchStrength, matchedInputs: stringArray(record.matchedInputs, 6) }];
+  }) : [];
+  const roles = Array.isArray(raw.suggestedRoles) ? raw.suggestedRoles.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const title = textValue(record.title);
+    return title ? [{ title, purpose: textValue(record.purpose) }] : [];
+  }).slice(0, 8) : [];
+  const kpis = Array.isArray(primary.kpis) ? primary.kpis.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const name = textValue(record.name);
+    return name ? [{
+      name,
+      measure: textValue(record.measure),
+      cadence: textValue(record.cadence),
+      targetGuide: textValue(record.targetGuide),
+      rationale: textValue(record.rationale),
+    }] : [];
+  }).slice(0, 8) : [];
+  const title = textValue(primary.title, input.roleTitleHint ?? `${input.teamName} 담당자`);
+  return {
+    teamMission: textValue(raw.teamMission, input.teamRole),
+    teamOutputs: stringArray(raw.teamOutputs, 8),
+    teamResponsibilities: stringArray(raw.teamResponsibilities, 10),
+    stakeholders: stringArray(raw.stakeholders, 10),
+    suggestedRoles: roles.length > 0 ? roles : [{ title, purpose: input.teamRole }],
+    primaryRole: {
+      title,
+      mission: textValue(primary.mission, input.teamRole),
+      outputs: stringArray(primary.outputs, 8),
+      responsibilities: normalizeGroundedItems(primary.responsibilities, allowedCodes, [fallbackResponsibility]),
+      requiredQualifications: normalizeGroundedItems(primary.requiredQualifications, allowedCodes, []),
+      preferredQualifications: normalizeGroundedItems(primary.preferredQualifications, allowedCodes, []),
+      tools: stringArray(primary.tools, 10),
+      stakeholders: stringArray(primary.stakeholders, 10),
+      kpis,
+    },
+    ncsMappings: mappings,
+  };
+}
+
+export async function generateGroundedDesign(input: {
+  organizationName: string;
+  company: CompanyContext;
+  teamName: string;
+  teamRole: string;
+  roleTitleHint: string | null;
+  candidates: NcsCandidate[];
+}): Promise<TeamDesign> {
+  const prompt = `당신은 한국 스타트업의 조직·직무설계 전문가입니다. 회사와 팀의 최소 정보로 바로 사용할 수 있는 직무기술서 v1.0을 설계하세요.
+
+[회사]
+${input.organizationName}
+${JSON.stringify(input.company)}
+
+[팀 입력]
+팀명: ${input.teamName}
+팀 역할: ${input.teamRole}
+직무명 힌트: ${input.roleTitleHint ?? "없음. 팀에 필요한 대표 직무명을 설계할 것"}
+
+[검색된 NCS 후보]
+${JSON.stringify(input.candidates.map((item) => ({ code: item.ncsCode, name: item.name, level: item.level, definition: item.definition, classification: [item.lclasName, item.mclasName, item.sclasName, item.subdName].filter(Boolean).join(" > ") })))}
+
+[설계 원칙]
+- NCS는 회사 맥락을 보완하는 근거이며 회사 현실을 덮어쓰지 않습니다.
+- ncsCodes와 ncsMappings에는 위 후보 목록에 실제 존재하는 코드만 사용합니다.
+- 관련성이 낮거나 산업이 충돌하는 후보는 사용하지 않습니다. 적합한 후보가 없으면 빈 배열을 허용합니다.
+- 회사 자료에 없는 학위, 경력연수, 자격증을 필수 조건으로 발명하지 않습니다.
+- 각 책임은 행동, 대상, 산출물 또는 결과가 드러나는 문장으로 씁니다.
+- KPI 목표값은 외부 수치를 복사하지 말고 회사가 기준선을 정할 수 있는 targetGuide로 작성합니다.
+- suggestedRoles는 팀 기능을 수행하는 역할 포트폴리오이며 primaryRole은 이번에 생성할 대표 JD입니다.
+- 응답 객체의 payload에는 아래 계약을 만족하는 JSON 객체 하나를 문자열로 직렬화해 넣습니다. 마크다운 코드블록은 사용하지 않습니다.
+
+[payload 내부 JSON 계약]
+{
+  "teamMission": "string",
+  "teamOutputs": ["string"],
+  "teamResponsibilities": ["string"],
+  "stakeholders": ["string"],
+  "suggestedRoles": [{"title": "string", "purpose": "string"}],
+  "primaryRole": {
+    "title": "string", "mission": "string", "outputs": ["string"],
+    "responsibilities": [{"content": "string", "ncsCodes": ["string"], "basis": "company|team_input|ncs|ai_inference"}],
+    "requiredQualifications": [{"content": "string", "ncsCodes": ["string"], "basis": "company|team_input|ncs|ai_inference"}],
+    "preferredQualifications": [{"content": "string", "ncsCodes": ["string"], "basis": "company|team_input|ncs|ai_inference"}],
+    "tools": ["string"], "stakeholders": ["string"],
+    "kpis": [{"name": "string", "measure": "string", "cadence": "string", "targetGuide": "string", "rationale": "string"}]
+  },
+  "ncsMappings": [{"ncsCode": "string", "rationale": "string", "matchStrength": "high|medium|low", "matchedInputs": ["string"]}]
+}`;
+  const encoded = await generateStructured<Record<string, unknown>>([{ text: prompt }], encodedPayloadSchema, "직무설계 초안 생성");
+  return normalizeDesign(parseEncodedPayload(encoded, "직무설계 초안 생성"), input);
+}
+
+export async function validateGroundedDesign(input: {
+  organizationName: string;
+  company: CompanyContext;
+  teamName: string;
+  teamRole: string;
+  roleTitleHint: string | null;
+  candidates: NcsCandidate[];
+  design: TeamDesign;
+  revisionLabel: "v1.0" | "v1.1";
+}): Promise<ValidationResult> {
+  const prompt = `당신은 NCS 근거 직무기술서의 독립 검토자입니다. ${input.revisionLabel} 초안을 검토하고 필요한 수정을 design에 반영하세요.
+
+[회사]
+${input.organizationName}
+${JSON.stringify(input.company)}
+
+[팀 입력]
+팀명: ${input.teamName}
+팀 역할: ${input.teamRole}
+
+[허용된 NCS 후보]
+${JSON.stringify(input.candidates)}
+
+[검토 대상]
+${JSON.stringify(input.design)}
+
+[필수 검토]
+- 회사 및 팀 맥락과 직무 미션의 일관성
+- 서로 다른 산업분류가 잘못 섞이지 않았는지
+- 책임별 NCS 코드가 실제 과업과 연결되는지
+- NCS에 없는 회사 고유 책임이 company 또는 team_input 근거로 구분됐는지
+- 확인되지 않은 학위, 연차, 자격증이 필수요건으로 발명되지 않았는지
+- KPI가 측정방법, 주기, 목표 설정 방법, 근거를 포함하는지
+- 허용 목록에 없는 NCS 코드는 모두 제거할 것
+
+coverageScore는 NCS 비율이 아니라 전체 핵심 문장이 회사·팀·NCS 중 적절한 출처로 설명되는 정도입니다.
+
+응답 객체의 payload에는 다음 키를 가진 JSON 객체를 문자열로 직렬화해 넣으세요. 마크다운 코드블록은 사용하지 않습니다.
+- status: passed | passed_with_notes | needs_review
+- coverageScore: 0~100 정수
+- summary: 검토 요약
+- findings: [{severity: info|warning|critical, category: string, message: string}]
+- design: 검토와 수정을 반영한 완전한 직무설계 객체. 입력된 [검토 대상]과 동일한 키 구조를 모두 유지합니다.`;
+  const encoded = await generateStructured<Record<string, unknown>>([{ text: prompt }], encodedPayloadSchema, "NCS 독립 검토");
+  const raw = parseEncodedPayload(encoded, "NCS 독립 검토");
+  const statusValue = textValue(raw.status);
+  const status: ValidationResult["status"] = ["passed", "passed_with_notes", "needs_review"].includes(statusValue)
+    ? statusValue as ValidationResult["status"]
+    : "passed_with_notes";
+  const findings = Array.isArray(raw.findings) ? raw.findings.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const message = textValue(record.message);
+    if (!message) return [];
+    const severityValue = textValue(record.severity);
+    const severity: "info" | "warning" | "critical" = ["info", "warning", "critical"].includes(severityValue)
+      ? severityValue as "info" | "warning" | "critical"
+      : "info";
+    return [{ severity, category: textValue(record.category, "일반"), message }];
+  }).slice(0, 12) : [];
+  const rawDesign = raw.design && typeof raw.design === "object" ? raw.design as Record<string, unknown> : input.design as unknown as Record<string, unknown>;
+  return {
+    status,
+    coverageScore: typeof raw.coverageScore === "number" ? Math.max(0, Math.min(100, Math.round(raw.coverageScore))) : 0,
+    summary: textValue(raw.summary, "NCS 및 회사 맥락 검토가 완료되었습니다."),
+    findings,
+    design: normalizeDesign(rawDesign, input),
+  };
+}
