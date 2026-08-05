@@ -81,8 +81,8 @@ export default async function Home() {
             <section className="rounded-3xl bg-slate-950 p-8 text-white sm:p-10">
               <p className="text-sm font-semibold text-blue-300">Workspace connection required</p>
               <h1 className="mt-3 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">만든 회사를 실제 작업 공간으로 연결하세요.</h1>
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">회사 생성과 조직 가입은 분리되어 있습니다. 관리자 화면에서 퓨리오젠의 ‘내 계정 연결’을 누르면 초대 로직을 통해 안전하게 조직 멤버가 되고, 아래 기능이 활성화됩니다.</p>
-              <Link href="/admin" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500">퓨리오젠 연결하기<ArrowRight className="h-4 w-4" /></Link>
+              <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">회사 생성과 조직 가입은 분리되어 있습니다. 관리자 화면에서 소속 회사의 ‘내 계정 연결’을 누르면 초대 로직을 통해 안전하게 조직 멤버가 되고, 아래 기능이 활성화됩니다.</p>
+              <Link href="/admin" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500">회사 연결하기<ArrowRight className="h-4 w-4" /></Link>
             </section>
             <WorkflowOverview disabled />
           </>
@@ -90,7 +90,7 @@ export default async function Home() {
           <>
             <section className="flex flex-col justify-between gap-6 rounded-3xl bg-slate-950 p-8 text-white sm:flex-row sm:items-end sm:p-10">
               <div>
-                <p className="text-sm font-semibold text-blue-300">{organizations.map((org) => org.name).join(" · ")} Workspace{isSuperAdmin ? " · Super Admin" : ""}</p>
+                <p className="text-sm font-semibold text-blue-300">{organizations.length > 1 ? `${organizations.length}개 회사 접근 권한` : `${organizations[0]?.name} Workspace`}{isSuperAdmin ? " · Super Admin" : ""}</p>
                 <h1 className="mt-3 max-w-3xl text-3xl font-bold tracking-tight sm:text-4xl">회사를 이해한 AI가 NCS 근거로 직무를 설계합니다.</h1>
                 <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">회사 소개자료와 간단한 팀 역할만 입력하면 Gemini가 팀 구조와 직무기술서 v1.0을 만들고 NCS 근거 루프로 다시 검토합니다.</p>
               </div>
