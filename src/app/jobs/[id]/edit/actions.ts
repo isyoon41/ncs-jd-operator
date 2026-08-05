@@ -13,6 +13,8 @@ import {
   type NcsCandidate,
   type TeamDesign,
 } from "@/lib/jd/company-designer";
+import { checkAiGenerationRateLimit, recordAiGenerationEvent } from "@/lib/jd/rate-limit";
+import { confidenceForMatchStrength } from "@/lib/jd/text-utils";
 
 export type RefineJdState = { error: string | null };
 
@@ -80,6 +82,9 @@ export async function refineJdDraft(
   const { data: canAccess } = await supabase.rpc("is_org_member", { target_org_id: role.teams.organization_id });
   if (!canAccess) return { error: "이 직무를 수정할 권한이 없습니다." };
 
+  const rateLimit = await checkAiGenerationRateLimit(supabase, role.teams.organization_id, user.id);
+  if (!rateLimit.allowed) return { error: rateLimit.message };
+
   const { data: versions } = await supabase
     .from("jd_versions")
     .select("id, version_no, version_major, version_minor, organization_profile_id, design_snapshot")
@@ -108,6 +113,8 @@ export async function refineJdDraft(
       : teamMission;
 
   try {
+    await recordAiGenerationEvent(supabase, role.teams.organization_id, user.id, "refine");
+
     const additionalContext = [teamMission, ...teamOutputs, ...teamResponsibilities, mission, ...outputs, ...responsibilities, ...requiredQualifications, ...preferredQualifications, ...tools, ...stakeholders].join("\n");
     const plan = await planNcsSearch({
       company,
@@ -255,7 +262,7 @@ export async function refineJdDraft(
             source: "ncs" as const,
             ncs_competency_unit_id: candidate.id,
             snippet: mapping?.rationale ?? `${candidate.name}과 연결`,
-            confidence: mapping?.matchStrength === "high" ? 0.9 : 0.7,
+            confidence: confidenceForMatchStrength(mapping?.matchStrength),
           }] : [];
         });
         return [...ncsEvidence, {

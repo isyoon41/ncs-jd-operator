@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_generation_events: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          organization_id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          organization_id: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          organization_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_generation_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jd_evidence: {
         Row: {
           confidence: number | null
@@ -97,6 +129,47 @@ export type Database = {
           },
         ]
       }
+      jd_validation_runs: {
+        Row: {
+          coverage_score: number
+          created_at: string
+          findings: Json
+          id: string
+          jd_version_id: string
+          model: string
+          status: string
+          summary: string
+        }
+        Insert: {
+          coverage_score?: number
+          created_at?: string
+          findings?: Json
+          id?: string
+          jd_version_id: string
+          model?: string
+          status: string
+          summary: string
+        }
+        Update: {
+          coverage_score?: number
+          created_at?: string
+          findings?: Json
+          id?: string
+          jd_version_id?: string
+          model?: string
+          status?: string
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jd_validation_runs_jd_version_id_fkey"
+            columns: ["jd_version_id"]
+            isOneToOne: false
+            referencedRelation: "jd_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jd_versions: {
         Row: {
           created_at: string
@@ -153,47 +226,6 @@ export type Database = {
             columns: ["team_role_id"]
             isOneToOne: false
             referencedRelation: "team_roles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      jd_validation_runs: {
-        Row: {
-          coverage_score: number
-          created_at: string
-          findings: Json
-          id: string
-          jd_version_id: string
-          model: string
-          status: string
-          summary: string
-        }
-        Insert: {
-          coverage_score?: number
-          created_at?: string
-          findings?: Json
-          id?: string
-          jd_version_id: string
-          model?: string
-          status: string
-          summary: string
-        }
-        Update: {
-          coverage_score?: number
-          created_at?: string
-          findings?: Json
-          id?: string
-          jd_version_id?: string
-          model?: string
-          status?: string
-          summary?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "jd_validation_runs_jd_version_id_fkey"
-            columns: ["jd_version_id"]
-            isOneToOne: false
-            referencedRelation: "jd_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -316,6 +348,38 @@ export type Database = {
           },
         ]
       }
+      organization_members: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string
+          role: Database["public"]["Enums"]["org_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id: string
+          role?: Database["public"]["Enums"]["org_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string
+          role?: Database["public"]["Enums"]["org_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_profiles: {
         Row: {
           created_at: string
@@ -400,38 +464,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "organization_sources_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      organization_members: {
-        Row: {
-          created_at: string
-          id: string
-          organization_id: string
-          role: Database["public"]["Enums"]["org_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          organization_id: string
-          role?: Database["public"]["Enums"]["org_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          organization_id?: string
-          role?: Database["public"]["Enums"]["org_role"]
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "organization_members_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"

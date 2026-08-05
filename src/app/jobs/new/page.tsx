@@ -4,6 +4,8 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { JdCreateForm } from "@/components/jobs/jd-create-form";
 
+export const maxDuration = 300;
+
 export default async function NewJobPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

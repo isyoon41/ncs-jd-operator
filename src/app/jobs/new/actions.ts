@@ -13,6 +13,8 @@ import {
   type CompanyContext,
   type GroundedItem,
 } from "@/lib/jd/company-designer";
+import { checkAiGenerationRateLimit, recordAiGenerationEvent } from "@/lib/jd/rate-limit";
+import { confidenceForMatchStrength, escapeLikePattern, safeFileName } from "@/lib/jd/text-utils";
 
 export type CreateJdState = { error: string | null };
 
@@ -25,8 +27,6 @@ const text = (formData: FormData, key: string, max: number) =>
 const isUpload = (value: FormDataEntryValue | null): value is File =>
   value instanceof File && value.size > 0;
 
-const safeFileName = (name: string) =>
-  name.normalize("NFKC").replace(/[^가-힣a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(-120) || "company-source";
 
 export async function createJdDraft(
   _previousState: CreateJdState,
@@ -69,6 +69,9 @@ export async function createJdDraft(
     .maybeSingle();
   if (!organization) return { error: "회사를 찾을 수 없습니다." };
 
+  const rateLimit = await checkAiGenerationRateLimit(supabase, organizationId, user.id);
+  if (!rateLimit.allowed) return { error: rateLimit.message };
+
   const { data: latestProfiles } = await supabase
     .from("organization_profiles")
     .select("id, version_no, summary, structured_context")
@@ -82,7 +85,18 @@ export async function createJdDraft(
   }
 
   let createdRoleId: string | null = null;
+  let createdProfileId: string | null = null;
+  const createdSourceIds: string[] = [];
+  const uploadedStoragePaths: string[] = [];
+  const cleanupNewCompanySource = async () => {
+    if (createdProfileId) await supabase.from("organization_profiles").delete().eq("id", createdProfileId);
+    if (createdSourceIds.length > 0) await supabase.from("organization_sources").delete().in("id", createdSourceIds);
+    if (uploadedStoragePaths.length > 0) await supabase.storage.from("company-sources").remove(uploadedStoragePaths);
+  };
+
   try {
+    await recordAiGenerationEvent(supabase, organizationId, user.id, "create");
+
     let companyContext: CompanyContext;
     let profileId = latestProfile?.id ?? null;
 
@@ -104,13 +118,15 @@ export async function createJdDraft(
           .single();
         if (error) return { error: `회사 소개를 저장하지 못했습니다: ${error.message}` };
         sourceIds.push(source.id);
+        createdSourceIds.push(source.id);
       }
       if (companyFile) {
         const storagePath = `${organizationId}/${crypto.randomUUID()}-${safeFileName(companyFile.name)}`;
         const { error: uploadError } = await supabase.storage
           .from("company-sources")
           .upload(storagePath, companyFile, { contentType: companyFile.type, upsert: false });
-        if (uploadError) return { error: `회사 자료를 업로드하지 못했습니다: ${uploadError.message}` };
+        if (uploadError) { await cleanupNewCompanySource(); return { error: `회사 자료를 업로드하지 못했습니다: ${uploadError.message}` }; }
+        uploadedStoragePaths.push(storagePath);
         const { data: source, error } = await supabase
           .from("organization_sources")
           .insert({
@@ -124,8 +140,9 @@ export async function createJdDraft(
           })
           .select("id")
           .single();
-        if (error) return { error: `업로드 자료의 메타데이터를 저장하지 못했습니다: ${error.message}` };
+        if (error) { await cleanupNewCompanySource(); return { error: `업로드 자료의 메타데이터를 저장하지 못했습니다: ${error.message}` }; }
         sourceIds.push(source.id);
+        createdSourceIds.push(source.id);
       }
 
       companyContext = await analyzeCompanyContext({
@@ -146,8 +163,9 @@ export async function createJdDraft(
         })
         .select("id")
         .single();
-      if (profileError) return { error: `회사 프로필을 저장하지 못했습니다: ${profileError.message}` };
+      if (profileError) { await cleanupNewCompanySource(); return { error: `회사 프로필을 저장하지 못했습니다: ${profileError.message}` }; }
       profileId = profile.id;
+      createdProfileId = profile.id;
     } else {
       companyContext = latestProfile!.structured_context as unknown as CompanyContext;
     }
@@ -190,7 +208,7 @@ export async function createJdDraft(
       .from("teams")
       .select("id")
       .eq("organization_id", organizationId)
-      .ilike("name", teamName)
+      .ilike("name", escapeLikePattern(teamName))
       .limit(1)
       .maybeSingle();
     let teamId = existingTeam?.id ?? null;
@@ -199,14 +217,14 @@ export async function createJdDraft(
         .from("teams")
         .update({ mission: design.teamMission, charter: teamCharter, updated_at: new Date().toISOString() })
         .eq("id", teamId);
-      if (error) return { error: `팀 설계를 저장하지 못했습니다: ${error.message}` };
+      if (error) { await cleanupNewCompanySource(); return { error: `팀 설계를 저장하지 못했습니다: ${error.message}` }; }
     } else {
       const { data: team, error } = await supabase
         .from("teams")
         .insert({ organization_id: organizationId, name: teamName, mission: design.teamMission, charter: teamCharter })
         .select("id")
         .single();
-      if (error) return { error: `팀을 만들지 못했습니다: ${error.message}` };
+      if (error) { await cleanupNewCompanySource(); return { error: `팀을 만들지 못했습니다: ${error.message}` }; }
       teamId = team.id;
     }
 
@@ -226,10 +244,11 @@ export async function createJdDraft(
       .insert({ team_id: teamId!, title: design.primaryRole.title, intake: roleIntake, status: "draft" })
       .select("id")
       .single();
-    if (roleError) return { error: `직무를 저장하지 못했습니다: ${roleError.message}` };
+    if (roleError) { await cleanupNewCompanySource(); return { error: `직무를 저장하지 못했습니다: ${roleError.message}` }; }
 
     const failRole = async (message: string) => {
       await supabase.from("team_roles").delete().eq("id", role.id);
+      await cleanupNewCompanySource();
       return { error: message };
     };
     const { data: version, error: versionError } = await supabase
@@ -282,7 +301,7 @@ export async function createJdDraft(
             source: "ncs" as const,
             ncs_competency_unit_id: candidate.id,
             snippet: design.ncsMappings.find((mapping) => mapping.ncsCode === code)?.rationale ?? `${candidate.name}과 연결`,
-            confidence: design.ncsMappings.find((mapping) => mapping.ncsCode === code)?.matchStrength === "high" ? 0.9 : 0.7,
+            confidence: confidenceForMatchStrength(design.ncsMappings.find((mapping) => mapping.ncsCode === code)?.matchStrength),
           }] : [];
         });
         return [...ncsRows, {
@@ -336,6 +355,7 @@ export async function createJdDraft(
 
     createdRoleId = role.id;
   } catch (error) {
+    if (!createdRoleId) await cleanupNewCompanySource();
     const message = error instanceof Error ? error.message : "알 수 없는 오류";
     return { error: `직무설계 중 문제가 발생했습니다: ${message.slice(0, 400)}` };
   }

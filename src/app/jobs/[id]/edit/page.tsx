@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/database.types";
 import { JdRefineForm } from "@/components/jobs/jd-refine-form";
 
+export const maxDuration = 300;
+
 function record(value: Json): Record<string, Json | undefined> {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
