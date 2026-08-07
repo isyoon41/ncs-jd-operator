@@ -437,7 +437,8 @@ ${JSON.stringify(input.candidates.map((item) => ({ code: item.ncsCode, name: ite
 - "혁신적인", "최고의", "탁월한" 같은 근거 없는 수식어를 쓰지 않습니다. 구체적인 행동·대상·산출물로 표현합니다.
 
 [설계 원칙]
-- teamMission과 primaryRole.mission은 회사의 mission/vision/coreValues와 연결되도록 작성합니다. 팀과 직무가 왜 존재하는지가 회사의 목적에서 나오게 하세요.
+- teamMission과 primaryRole.mission을 쓸 때, 회사 mission의 핵심 목적뿐 아니라 vision이 가리키는 방향성과 coreValues 중 이 팀이 실제로 구현하는 가치 최소 1개를 함께 반영하세요. 세 가지를 기계적으로 나열하지 말고 자연스러운 한 문장으로 녹이세요. mission만 살짝 바꿔 쓰고 vision·coreValues를 무시하는 것은 금지합니다.
+- reasoningNotes.contextUnderstanding에는 이번 설계에 실제로 반영한 mission·vision·coreValues 내용을 구체적으로 인용하세요(예: "비전의 '기술혁신 산업 리더십' 방향과 핵심가치 '동반성장'을 팀 미션에 반영함"). "회사 미션에 맞춰 구체화했다"처럼 내용을 인용하지 않는 두루뭉술한 문장은 금지합니다.
 - NCS는 회사 맥락을 보완하는 근거이며 회사 현실을 덮어쓰지 않습니다.
 - ncsCodes와 ncsMappings에는 위 후보 목록에 실제 존재하는 코드만 사용합니다.
 - 관련성이 낮거나 산업이 충돌하는 후보는 사용하지 않습니다. 적합한 후보가 없으면 빈 배열을 허용합니다.
@@ -511,6 +512,7 @@ ${JSON.stringify(input.design)}
 - KPI가 측정방법, 주기, 목표 설정 방법, 근거를 포함하는지
 - 허용 목록에 없는 NCS 코드는 모두 제거할 것
 - reasoningNotes가 실제 판단 근거를 담고 있는지, 수정 사항이 있다면 해당 단계의 노트도 그에 맞게 갱신했는지
+- teamMission과 primaryRole.mission이 회사 mission뿐 아니라 vision의 방향성과 coreValues 중 최소 1개를 반영하는지. mission만 희미하게 echo하고 vision·coreValues가 전혀 안 보이면 design에서 직접 보완할 것. reasoningNotes.contextUnderstanding도 실제 mission·vision·coreValues 내용을 구체적으로 인용하도록 고칠 것
 - 미션·책임 문장이 "~한다"체이고 근거 없는 수식어("혁신적인", "최고의" 등)가 없는지, 자격요건이 명사구로 통일되어 있는지 — 어긋나는 문장은 design에서 직접 고칠 것
 
 coverageScore는 NCS 비율이 아니라 전체 핵심 문장이 회사·팀·NCS 중 적절한 출처로 설명되는 정도입니다.
