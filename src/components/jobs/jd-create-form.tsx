@@ -34,6 +34,7 @@ export function JdCreateForm({ organizations, profiles }: { organizations: Organ
   const [state, formAction, pending] = useActionState(createJdDraft, initialState);
   const [organizationId, setOrganizationId] = useState(organizations[0]?.id ?? "");
   const currentProfile = useMemo(() => profiles.find((profile) => profile.organization_id === organizationId), [profiles, organizationId]);
+  const [showNewSource, setShowNewSource] = useState(false);
 
   return (
     <form action={formAction} className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -41,12 +42,19 @@ export function JdCreateForm({ organizations, profiles }: { organizations: Organ
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <StepTitle number="01" eyebrow="Company context" icon={<Building2 className="h-5 w-5" />} title="Gemini가 회사를 먼저 이해합니다" text="회사 소개를 직접 입력하거나 IR·회사소개 자료를 올려 주세요. 확인 가능한 사실만 회사 프로필로 구조화해 이후 모든 팀과 직무설계에 재사용합니다." />
           <div className="space-y-5">
-            <Field label="회사"><select name="organizationId" value={organizationId} onChange={(event) => setOrganizationId(event.target.value)} className={inputClass} required>{organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}</select></Field>
-            {currentProfile && <div className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><div><p className="text-sm font-bold text-emerald-950">회사 프로필 v{currentProfile.version_no}이 준비되어 있습니다</p><p className="mt-1 text-xs leading-5 text-emerald-700">{currentProfile.summary}</p><p className="mt-2 text-xs font-semibold text-emerald-700">자료를 추가하지 않으면 이 프로필을 그대로 사용합니다.</p></div></div>}
-            <div className="grid gap-5 lg:grid-cols-2">
-              <Field label="회사 소개 직접 입력" hint={currentProfile ? "선택 · 새 프로필 생성" : "자료가 없으면 필수"}><textarea name="companyIntroduction" rows={9} className={inputClass} placeholder="예: OO기업은 제조 설비를 대상으로 예지보전 솔루션을 제공하고 있습니다. 주요 고객은 국내 중견 제조사이며…" maxLength={30000} /></Field>
-              <Field label="회사 소개·IR 자료" hint="선택 · PDF/TXT/MD, 최대 8MB"><label className="flex min-h-[244px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 text-center transition hover:border-blue-400 hover:bg-blue-50/40"><FileUp className="h-9 w-9 text-slate-300" /><span className="mt-4 text-sm font-bold text-slate-700">파일을 선택해 주세요</span><span className="mt-2 text-xs leading-5 text-slate-400">PDF는 표와 문서 구조까지 Gemini가 직접 읽습니다.<br />자료는 회사 전용 비공개 저장소에 보관됩니다.</span><input type="file" name="companyFile" accept="application/pdf,text/plain,text/markdown,.md,.txt,.pdf" className="mt-5 block w-full max-w-xs text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:font-bold file:text-white" /></label></Field>
-            </div>
+            <Field label="회사"><select name="organizationId" value={organizationId} onChange={(event) => { setOrganizationId(event.target.value); setShowNewSource(false); }} className={inputClass} required>{organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}</select></Field>
+            {currentProfile && <div className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><div><p className="text-sm font-bold text-emerald-950">회사 프로필 v{currentProfile.version_no}이 준비되어 있습니다</p><p className="mt-1 text-xs leading-5 text-emerald-700">{currentProfile.summary}</p><p className="mt-2 text-xs font-semibold text-emerald-700">별도 입력 없이 이 프로필을 그대로 사용해 바로 진행할 수 있습니다.</p></div></div>}
+            {currentProfile && !showNewSource ? (
+              <button type="button" onClick={() => setShowNewSource(true)} className="text-sm font-bold text-blue-600 hover:text-blue-700">다른 자료로 새 프로필 만들기</button>
+            ) : (
+              <div className="space-y-3">
+                {currentProfile && <button type="button" onClick={() => setShowNewSource(false)} className="text-sm font-bold text-slate-400 hover:text-slate-600">취소하고 기존 프로필 사용하기</button>}
+                <div className="grid gap-5 lg:grid-cols-2">
+                  <Field label="회사 소개 직접 입력" hint={currentProfile ? "선택 · 새 프로필 생성" : "자료가 없으면 필수"}><textarea name="companyIntroduction" rows={9} className={inputClass} placeholder="예: OO기업은 제조 설비를 대상으로 예지보전 솔루션을 제공하고 있습니다. 주요 고객은 국내 중견 제조사이며…" maxLength={30000} /></Field>
+                  <Field label="회사 소개·IR 자료" hint="선택 · PDF/TXT/MD, 최대 8MB"><label className="flex min-h-[244px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 text-center transition hover:border-blue-400 hover:bg-blue-50/40"><FileUp className="h-9 w-9 text-slate-300" /><span className="mt-4 text-sm font-bold text-slate-700">파일을 선택해 주세요</span><span className="mt-2 text-xs leading-5 text-slate-400">PDF는 표와 문서 구조까지 Gemini가 직접 읽습니다.<br />자료는 회사 전용 비공개 저장소에 보관됩니다.</span><input type="file" name="companyFile" accept="application/pdf,text/plain,text/markdown,.md,.txt,.pdf" className="mt-5 block w-full max-w-xs text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:font-bold file:text-white" /></label></Field>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
