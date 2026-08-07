@@ -6,6 +6,10 @@ export const GEMINI_MODEL = "gemini-3.6-flash";
 
 export type CompanyContext = {
   summary: string;
+  mission: string;
+  vision: string;
+  coreValues: string[];
+  mvcBasis: "stated" | "inferred";
   businessAreas: string[];
   productsServices: string[];
   customers: string[];
@@ -139,6 +143,10 @@ const companySchema = {
   type: "OBJECT",
   properties: {
     summary: { type: "STRING" },
+    mission: { type: "STRING" },
+    vision: { type: "STRING" },
+    coreValues: { type: "ARRAY", items: { type: "STRING" }, maxItems: 6 },
+    mvcBasis: { type: "STRING", enum: ["stated", "inferred"] },
     businessAreas: { type: "ARRAY", items: { type: "STRING" }, maxItems: 8 },
     productsServices: { type: "ARRAY", items: { type: "STRING" }, maxItems: 10 },
     customers: { type: "ARRAY", items: { type: "STRING" }, maxItems: 8 },
@@ -149,7 +157,7 @@ const companySchema = {
     keyTerms: { type: "ARRAY", items: { type: "STRING" }, maxItems: 16 },
     uncertainties: { type: "ARRAY", items: { type: "STRING" }, maxItems: 8 },
   },
-  required: ["summary", "businessAreas", "productsServices", "customers", "businessModel", "growthStage", "strategicPriorities", "culture", "keyTerms", "uncertainties"],
+  required: ["summary", "mission", "vision", "coreValues", "mvcBasis", "businessAreas", "productsServices", "customers", "businessModel", "growthStage", "strategicPriorities", "culture", "keyTerms", "uncertainties"],
 } as const;
 
 export async function analyzeCompanyContext(input: {
@@ -169,7 +177,12 @@ ${input.introduction || "없음"}
 - 자료에 없는 사실은 만들지 말고 uncertainties에 기록하세요.
 - 채용 홍보 문구가 아니라 팀과 직무를 설계하는 데 필요한 사업 맥락을 정리하세요.
 - 고유명사, 제품명, 고객군, 규제·기술 용어는 keyTerms에 보존하세요.
-- 결과는 지정된 JSON 스키마만 따르세요.`;
+- 결과는 지정된 JSON 스키마만 따르세요.
+
+[미션·비전·핵심가치(MVC) 처리]
+- 자료에 미션·비전·핵심가치가 명시되어 있으면 그대로 정리하고 mvcBasis를 "stated"로 표시하세요.
+- 명시되어 있지 않다면(대부분의 스타트업이 이 경우입니다), 사업모델·제품/서비스·고객·전략 우선순위 등 자료에서 확인된 사실을 근거로 이 회사가 실제로 추구하는 목적과 가치를 논리적으로 정리하세요. 자료에 없는 새로운 사실(수치, 연혁, 수상 이력 등)을 지어내는 것과는 다릅니다 — 이미 확인된 사실을 압축·재구성하는 것입니다. 이 경우 mvcBasis를 "inferred"로 표시하세요.
+- coreValues는 짧은 명사구 2~5개로 씁니다.`;
   const parts: GeminiPart[] = [{ text: prompt }];
   if (input.file) {
     if (input.file.type === "application/pdf") {
@@ -181,8 +194,13 @@ ${input.introduction || "없음"}
     }
   }
   const raw = await generateStructured<Record<string, unknown>>(parts, companySchema, "회사 프로필 분석");
+  const mvcBasisValue = textValue(raw.mvcBasis);
   return {
     summary: textValue(raw.summary, input.introduction || `${input.organizationName} 회사 프로필`),
+    mission: textValue(raw.mission, "자료에서 확인되지 않음"),
+    vision: textValue(raw.vision, "자료에서 확인되지 않음"),
+    coreValues: stringArray(raw.coreValues, 6),
+    mvcBasis: mvcBasisValue === "stated" ? "stated" : "inferred",
     businessAreas: stringArray(raw.businessAreas, 8),
     productsServices: stringArray(raw.productsServices, 10),
     customers: stringArray(raw.customers, 8),
@@ -406,7 +424,7 @@ ${JSON.stringify(input.candidates.map((item) => ({ code: item.ncsCode, name: ite
 
 [사고 순서]
 아래 5단계 순서로 판단한 뒤 결과를 작성하세요. 각 단계의 판단 근거는 reasoningNotes에 남깁니다.
-1. 직무 맥락 파악 — 회사의 산업·사업모델과 이 팀이 맡은 기능을 이해합니다.
+1. 직무 맥락 파악 — 회사의 미션·비전·핵심가치(mission/vision/coreValues)와 산업·사업모델을 함께 이해하고, 이 팀이 맡은 기능이 그 목적에 어떻게 기여하는지 파악합니다.
 2. 능력단위 선별 — 검색된 NCS 후보 중 이 팀의 과업과 실제로 맞닿는 것만 채택하고, 산업이나 과업이 무관한 후보는 제외합니다.
 3. 책임·산출물 설계 — 팀 역할을 핵심 산출물과 주요 책임으로 구체화합니다.
 4. 근거 구분 — 문장마다 회사 자료, 팀 입력, NCS, AI 보완 중 무엇에서 나왔는지 정리합니다.
@@ -419,6 +437,7 @@ ${JSON.stringify(input.candidates.map((item) => ({ code: item.ncsCode, name: ite
 - "혁신적인", "최고의", "탁월한" 같은 근거 없는 수식어를 쓰지 않습니다. 구체적인 행동·대상·산출물로 표현합니다.
 
 [설계 원칙]
+- teamMission과 primaryRole.mission은 회사의 mission/vision/coreValues와 연결되도록 작성합니다. 팀과 직무가 왜 존재하는지가 회사의 목적에서 나오게 하세요.
 - NCS는 회사 맥락을 보완하는 근거이며 회사 현실을 덮어쓰지 않습니다.
 - ncsCodes와 ncsMappings에는 위 후보 목록에 실제 존재하는 코드만 사용합니다.
 - 관련성이 낮거나 산업이 충돌하는 후보는 사용하지 않습니다. 적합한 후보가 없으면 빈 배열을 허용합니다.
