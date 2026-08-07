@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/database.types";
+import { JdPdfDownloadButton } from "@/components/jobs/jd-pdf-download-button";
+import type { JdPdfData } from "@/lib/pdf/jd-document";
 
 const labels = {
   mission: "직무 미션",
@@ -97,12 +99,34 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const suggestedRoles = objectList(teamCharter.suggestedRoles);
   const semanticVersion = `${version.version_major}.${version.version_minor}`;
 
+  const pdfData: JdPdfData = {
+    organizationName: role.teams?.organizations?.name ?? "",
+    teamName: role.teams?.name ?? "",
+    roleTitle: role.title,
+    mission: grouped.mission?.[0]?.content ?? "",
+    outputs,
+    responsibilities: (grouped.responsibility ?? []).map((section) => section.content),
+    requiredQualifications: (grouped.qualification_required ?? []).map((section) => section.content),
+    preferredQualifications: (grouped.qualification_preferred ?? []).map((section) => section.content),
+    kpis: (grouped.kpi ?? []).map((section) => {
+      const metadata = record(section.metadata);
+      return {
+        name: section.content,
+        measure: textField(metadata.measure),
+        cadence: textField(metadata.cadence),
+        targetGuide: textField(metadata.targetGuide),
+      };
+    }),
+    versionLabel: `v${semanticVersion}`,
+    generatedAt: new Date(version.created_at).toLocaleDateString("ko-KR"),
+  };
+
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-900"><ArrowLeft className="h-4 w-4" />대시보드</Link>
-          <div className="flex gap-2">{canCreateV11 && <Link href={`/jobs/${id}/edit`} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-blue-200 hover:text-blue-700"><Pencil className="h-4 w-4" />v1.1 보완하기</Link>}<Link href="/jobs/new" className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white"><Plus className="h-4 w-4" />{isGroundedVersion ? "새 직무설계" : "새 방식으로 재설계"}</Link></div>
+          <div className="flex gap-2"><JdPdfDownloadButton data={pdfData} />{canCreateV11 && <Link href={`/jobs/${id}/edit`} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-blue-200 hover:text-blue-700"><Pencil className="h-4 w-4" />v1.1 보완하기</Link>}<Link href="/jobs/new" className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white"><Plus className="h-4 w-4" />{isGroundedVersion ? "새 직무설계" : "새 방식으로 재설계"}</Link></div>
         </div>
 
         <header className="mt-7 overflow-hidden rounded-3xl bg-slate-950 text-white">
