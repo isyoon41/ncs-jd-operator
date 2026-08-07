@@ -41,7 +41,16 @@ export type GroundedItem = {
   basis: "company" | "team_input" | "ncs" | "ai_inference";
 };
 
+export type ReasoningNotes = {
+  contextUnderstanding: string;
+  competencySelection: string;
+  responsibilityDesign: string;
+  evidenceClassification: string;
+  qualificationAndKpi: string;
+};
+
 export type TeamDesign = {
+  reasoningNotes: ReasoningNotes;
   teamMission: string;
   teamOutputs: string[];
   teamResponsibilities: string[];
@@ -301,6 +310,17 @@ function normalizeGroundedItems(value: unknown, allowedCodes: Set<string>, fallb
   return items.length > 0 ? items : fallback;
 }
 
+function normalizeReasoningNotes(value: unknown): ReasoningNotes {
+  const record = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  return {
+    contextUnderstanding: textValue(record.contextUnderstanding),
+    competencySelection: textValue(record.competencySelection),
+    responsibilityDesign: textValue(record.responsibilityDesign),
+    evidenceClassification: textValue(record.evidenceClassification),
+    qualificationAndKpi: textValue(record.qualificationAndKpi),
+  };
+}
+
 function normalizeDesign(raw: Record<string, unknown>, input: {
   teamName: string;
   teamRole: string;
@@ -341,6 +361,7 @@ function normalizeDesign(raw: Record<string, unknown>, input: {
   }).slice(0, 8) : [];
   const title = textValue(primary.title, input.roleTitleHint ?? `${input.teamName} 담당자`);
   return {
+    reasoningNotes: normalizeReasoningNotes(raw.reasoningNotes),
     teamMission: textValue(raw.teamMission, input.teamRole),
     teamOutputs: stringArray(raw.teamOutputs, 8),
     teamResponsibilities: stringArray(raw.teamResponsibilities, 10),
@@ -383,6 +404,14 @@ ${JSON.stringify(input.company)}
 [검색된 NCS 후보]
 ${JSON.stringify(input.candidates.map((item) => ({ code: item.ncsCode, name: item.name, level: item.level, definition: item.definition, classification: [item.lclasName, item.mclasName, item.sclasName, item.subdName].filter(Boolean).join(" > ") })))}
 
+[사고 순서]
+아래 5단계 순서로 판단한 뒤 결과를 작성하세요. 각 단계의 판단 근거는 reasoningNotes에 남깁니다.
+1. 직무 맥락 파악 — 회사의 산업·사업모델과 이 팀이 맡은 기능을 이해합니다.
+2. 능력단위 선별 — 검색된 NCS 후보 중 이 팀의 과업과 실제로 맞닿는 것만 채택하고, 산업이나 과업이 무관한 후보는 제외합니다.
+3. 책임·산출물 설계 — 팀 역할을 핵심 산출물과 주요 책임으로 구체화합니다.
+4. 근거 구분 — 문장마다 회사 자료, 팀 입력, NCS, AI 보완 중 무엇에서 나왔는지 정리합니다.
+5. 자격요건·KPI 정리 — 확인되지 않은 조건은 배제하고, 측정 가능한 KPI로 구성합니다.
+
 [설계 원칙]
 - NCS는 회사 맥락을 보완하는 근거이며 회사 현실을 덮어쓰지 않습니다.
 - ncsCodes와 ncsMappings에는 위 후보 목록에 실제 존재하는 코드만 사용합니다.
@@ -391,10 +420,18 @@ ${JSON.stringify(input.candidates.map((item) => ({ code: item.ncsCode, name: ite
 - 각 책임은 행동, 대상, 산출물 또는 결과가 드러나는 문장으로 씁니다.
 - KPI 목표값은 외부 수치를 복사하지 말고 회사가 기준선을 정할 수 있는 targetGuide로 작성합니다.
 - suggestedRoles는 팀 기능을 수행하는 역할 포트폴리오이며 primaryRole은 이번에 생성할 대표 JD입니다.
+- reasoningNotes의 각 문장은 실제 인사담당자·조직설계 컨설턴트가 검토의견을 남기듯 씁니다. "필터링", "매칭", "파싱", "스키마" 같은 개발 용어를 쓰지 말고 "선별", "연결", "검토", "구성" 같은 인사·조직설계 용어로 1~2문장씩 씁니다.
 - 응답 객체의 payload에는 아래 계약을 만족하는 JSON 객체 하나를 문자열로 직렬화해 넣습니다. 마크다운 코드블록은 사용하지 않습니다.
 
 [payload 내부 JSON 계약]
 {
+  "reasoningNotes": {
+    "contextUnderstanding": "string",
+    "competencySelection": "string",
+    "responsibilityDesign": "string",
+    "evidenceClassification": "string",
+    "qualificationAndKpi": "string"
+  },
   "teamMission": "string",
   "teamOutputs": ["string"],
   "teamResponsibilities": ["string"],
@@ -448,6 +485,7 @@ ${JSON.stringify(input.design)}
 - 확인되지 않은 학위, 연차, 자격증이 필수요건으로 발명되지 않았는지
 - KPI가 측정방법, 주기, 목표 설정 방법, 근거를 포함하는지
 - 허용 목록에 없는 NCS 코드는 모두 제거할 것
+- reasoningNotes가 실제 판단 근거를 담고 있는지, 수정 사항이 있다면 해당 단계의 노트도 그에 맞게 갱신했는지
 
 coverageScore는 NCS 비율이 아니라 전체 핵심 문장이 회사·팀·NCS 중 적절한 출처로 설명되는 정도입니다.
 
@@ -456,7 +494,7 @@ coverageScore는 NCS 비율이 아니라 전체 핵심 문장이 회사·팀·NC
 - coverageScore: 0~100 정수
 - summary: 검토 요약
 - findings: [{severity: info|warning|critical, category: string, message: string}]
-- design: 검토와 수정을 반영한 완전한 직무설계 객체. 입력된 [검토 대상]과 동일한 키 구조를 모두 유지합니다.`;
+- design: 검토와 수정을 반영한 완전한 직무설계 객체. 입력된 [검토 대상]과 동일한 키 구조를 모두 유지합니다. reasoningNotes를 수정할 때도 "필터링", "매칭" 같은 개발 용어 대신 인사·조직설계 용어로 씁니다.`;
   const encoded = await generateStructured<Record<string, unknown>>([{ text: prompt }], encodedPayloadSchema, "NCS 독립 검토");
   const raw = parseEncodedPayload(encoded, "NCS 독립 검토");
   const statusValue = textValue(raw.status);

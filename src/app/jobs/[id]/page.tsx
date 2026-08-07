@@ -9,6 +9,7 @@ import {
   FileCheck2,
   FileText,
   Gauge,
+  ListChecks,
   Network,
   Pencil,
   Plus,
@@ -29,6 +30,14 @@ const labels = {
   qualification_preferred: "우대 자격요건",
   kpi: "핵심 성과지표",
 } as const;
+
+const reasoningNoteLabels: Array<{ key: string; label: string }> = [
+  { key: "contextUnderstanding", label: "직무 맥락 파악" },
+  { key: "competencySelection", label: "능력단위 선별" },
+  { key: "responsibilityDesign", label: "책임·산출물 설계" },
+  { key: "evidenceClassification", label: "근거 구분" },
+  { key: "qualificationAndKpi", label: "자격요건·KPI 정리" },
+];
 
 function record(value: Json): Record<string, Json | undefined> {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -98,6 +107,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const teamResponsibilities = strings(teamCharter.teamResponsibilities ?? teamCharter.responsibilities);
   const suggestedRoles = objectList(teamCharter.suggestedRoles);
   const semanticVersion = `${version.version_major}.${version.version_minor}`;
+  const reasoningNotesRecord = record(designSnapshot.reasoningNotes ?? {});
+  const reasoningNoteEntries = reasoningNoteLabels
+    .map(({ key, label }) => ({ label, value: textField(reasoningNotesRecord[key]) }))
+    .filter((entry): entry is { label: string; value: string } => Boolean(entry.value));
 
   const pdfData: JdPdfData = {
     organizationName: role.teams?.organizations?.name ?? "",
@@ -156,6 +169,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center gap-2 text-blue-600"><Building2 className="h-4 w-4" /><p className="text-xs font-black uppercase tracking-[0.18em]">Company grounding</p></div><h2 className="mt-3 font-black text-slate-900">회사 프로필 v{profile?.version_no ?? "—"}</h2><p className="mt-3 text-sm leading-6 text-slate-600">{profile?.summary ?? "이전 방식으로 생성된 JD라 연결된 회사 프로필이 없습니다."}</p>{strings(companyContext.strategicPriorities).length > 0 && <div className="mt-4 border-t border-slate-100 pt-4"><p className="text-xs font-bold text-slate-400">핵심 전략</p><BulletList items={strings(companyContext.strategicPriorities).slice(0, 4)} compact /></div>}</section>
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center gap-2 text-blue-600"><Network className="h-4 w-4" /><p className="text-xs font-black uppercase tracking-[0.18em]">Team design</p></div><h2 className="mt-3 font-black text-slate-900">{role.teams?.name} 설계</h2><p className="mt-3 text-sm leading-6 text-slate-600">{role.teams?.mission}</p>{teamOutputs.length > 0 && <div className="mt-4"><p className="text-xs font-bold text-slate-400">팀 산출물</p><BulletList items={teamOutputs.slice(0, 4)} compact /></div>}{teamResponsibilities.length > 0 && <div className="mt-4"><p className="text-xs font-bold text-slate-400">팀 책임</p><BulletList items={teamResponsibilities.slice(0, 4)} compact /></div>}{suggestedRoles.length > 0 && <div className="mt-4 border-t border-slate-100 pt-4"><p className="text-xs font-bold text-slate-400">권장 역할 포트폴리오</p><div className="mt-3 space-y-2">{suggestedRoles.map((item, index) => <div key={index} className="rounded-xl bg-slate-50 p-3"><p className="text-sm font-bold text-slate-800">{textField(item.title)}</p><p className="mt-1 text-xs leading-5 text-slate-500">{textField(item.purpose)}</p></div>)}</div></div>}</section>
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center gap-2 text-blue-600"><ShieldCheck className="h-4 w-4" /><p className="text-xs font-black uppercase tracking-[0.18em]">NCS grounding</p></div><h2 className="mt-3 font-black text-slate-900">직무설계에 사용한 근거</h2><p className="mt-2 text-xs leading-5 text-slate-400">검색 결과가 아니라 Gemini가 회사·팀 맥락과 연결성을 재검토해 채택한 능력단위입니다.</p><div className="mt-4 space-y-3">{!isGroundedVersion ? <p className="rounded-xl bg-amber-50 p-3 text-sm leading-6 text-amber-800">이전 연결값은 새 근거 루프의 검증을 거치지 않아 숨겼습니다. 새 방식으로 다시 설계해 주세요.</p> : (mappingRows ?? []).length === 0 ? <p className="rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-500">직접 연결할 신뢰도 높은 NCS가 없어 회사·팀 입력을 중심 근거로 사용했습니다.</p> : (mappingRows ?? []).map((mapping) => { const unit = mapping.ncs_competency_units; return <div key={mapping.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><div className="flex items-start justify-between gap-2"><p className="text-sm font-black leading-5 text-slate-800">{unit?.name}</p><span className={`rounded-full px-2 py-1 text-[10px] font-black uppercase ${mapping.match_strength === "high" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{mapping.match_strength}</span></div><p className="mt-2 text-xs font-semibold text-slate-400">{unit?.ncs_code}{unit?.level ? ` · Level ${unit.level}` : ""}</p><p className="mt-3 text-xs leading-5 text-slate-600">{mapping.rationale}</p>{unit && [unit.lclas_name, unit.mclas_name, unit.sclas_name, unit.subd_name].some(Boolean) && <p className="mt-3 text-[11px] leading-5 text-slate-400">{[unit.lclas_name, unit.mclas_name, unit.sclas_name, unit.subd_name].filter(Boolean).join(" › ")}</p>}</div>; })}</div></section>
+            {reasoningNoteEntries.length > 0 && <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center gap-2 text-blue-600"><ListChecks className="h-4 w-4" /><p className="text-xs font-black uppercase tracking-[0.18em]">Design rationale</p></div><h2 className="mt-3 font-black text-slate-900">설계 근거</h2><p className="mt-2 text-xs leading-5 text-slate-400">AI가 각 단계에서 어떻게 판단했는지 남긴 검토 메모입니다.</p><div className="mt-4 space-y-4">{reasoningNoteEntries.map((entry) => <div key={entry.label}><p className="text-xs font-bold text-slate-400">{entry.label}</p><p className="mt-1 text-sm leading-6 text-slate-600">{entry.value}</p></div>)}</div></section>}
             {canCreateV11 ? <Link href={`/jobs/${id}/edit`} className="flex items-center justify-between rounded-2xl bg-blue-600 p-5 text-white shadow-lg shadow-blue-600/20"><div><p className="text-sm font-black">회사 고유 정보를 더 반영하시겠어요?</p><p className="mt-1 text-xs text-blue-100">선택 입력 후 NCS 재검토로 v1.1 생성</p></div><ArrowRight className="h-5 w-5" /></Link> : isGroundedVersion ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5"><p className="text-sm font-black text-emerald-900">v1.1 검토 완료</p><p className="mt-1 text-xs leading-5 text-emerald-700">회사 고유 정보와 NCS 근거를 다시 검토한 현재 완성본입니다.</p></div> : <Link href="/jobs/new" className="flex items-center justify-between rounded-2xl bg-blue-600 p-5 text-white shadow-lg shadow-blue-600/20"><div><p className="text-sm font-black">회사 맥락부터 다시 설계하세요</p><p className="mt-1 text-xs text-blue-100">새 근거 루프로 검증된 v1.0 생성</p></div><ArrowRight className="h-5 w-5" /></Link>}
           </aside>
         </div>

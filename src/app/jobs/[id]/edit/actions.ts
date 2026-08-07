@@ -169,7 +169,16 @@ export async function refineJdDraft(
         matchedInputs: jsonStrings(mapping.matched_inputs),
       }]];
     }));
+    const previousReasoningNotes = jsonRecord(snapshot.reasoningNotes ?? null);
+    const reasoningField = (key: string) => (typeof previousReasoningNotes[key] === "string" ? previousReasoningNotes[key] as string : "");
     const draft: TeamDesign = {
+      reasoningNotes: {
+        contextUnderstanding: reasoningField("contextUnderstanding"),
+        competencySelection: reasoningField("competencySelection"),
+        responsibilityDesign: reasoningField("responsibilityDesign"),
+        evidenceClassification: reasoningField("evidenceClassification"),
+        qualificationAndKpi: reasoningField("qualificationAndKpi"),
+      },
       teamMission,
       teamOutputs,
       teamResponsibilities,
