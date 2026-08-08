@@ -398,6 +398,7 @@ export type Database = {
           id: string
           organization_id: string
           role: Database["public"]["Enums"]["org_role"]
+          status: string
           user_id: string
         }
         Insert: {
@@ -405,6 +406,7 @@ export type Database = {
           id?: string
           organization_id: string
           role?: Database["public"]["Enums"]["org_role"]
+          status?: string
           user_id: string
         }
         Update: {
@@ -412,6 +414,7 @@ export type Database = {
           id?: string
           organization_id?: string
           role?: Database["public"]["Enums"]["org_role"]
+          status?: string
           user_id?: string
         }
         Relationships: [
@@ -775,6 +778,19 @@ export type Database = {
       is_org_admin: { Args: { target_org_id: string }; Returns: boolean }
       is_org_member: { Args: { target_org_id: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
+      list_all_organization_members: {
+        Args: never
+        Returns: {
+          created_at: string
+          member_id: string
+          organization_id: string
+          organization_name: string
+          role: Database["public"]["Enums"]["org_role"]
+          status: string
+          user_email: string
+          user_id: string
+        }[]
+      }
       list_pending_access_requests: {
         Args: never
         Returns: {

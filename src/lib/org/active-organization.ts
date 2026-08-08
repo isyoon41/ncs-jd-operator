@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
-export type AccessibleOrganization = { id: string; name: string; slug: string; memberRole: string };
+export type AccessibleOrganization = { id: string; name: string; slug: string; memberRole: string; status: "active" | "held" };
 
 export async function getAccessibleOrganizations(
   supabase: SupabaseClient<Database>,
@@ -11,13 +11,15 @@ export async function getAccessibleOrganizations(
   const { data: isSuperAdmin } = await supabase.rpc("is_platform_admin");
   const organizations: AccessibleOrganization[] = isSuperAdmin
     ? ((await supabase.from("organizations").select("id, name, slug").order("name")).data ?? [])
-        .map((organization) => ({ ...organization, memberRole: "super_admin" }))
+        .map((organization) => ({ ...organization, memberRole: "super_admin", status: "active" as const }))
     : ((await supabase
         .from("organization_members")
-        .select("organization_id, role, organizations(id, name, slug)")
+        .select("organization_id, role, status, organizations(id, name, slug)")
         .eq("user_id", userId)).data ?? [])
         .flatMap((membership) =>
-          membership.organizations ? [{ ...membership.organizations, memberRole: membership.role }] : [],
+          membership.organizations
+            ? [{ ...membership.organizations, memberRole: membership.role, status: membership.status === "held" ? ("held" as const) : ("active" as const) }]
+            : [],
         );
   return { organizations, isSuperAdmin: Boolean(isSuperAdmin) };
 }
@@ -27,5 +29,5 @@ export function resolveActiveOrgId(
   organizations: AccessibleOrganization[],
 ): string | null {
   if (!cookieValue) return null;
-  return organizations.some((organization) => organization.id === cookieValue) ? cookieValue : null;
+  return organizations.some((organization) => organization.id === cookieValue && organization.status === "active") ? cookieValue : null;
 }

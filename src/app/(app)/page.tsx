@@ -23,7 +23,9 @@ export default async function Home() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { organizations } = await getAccessibleOrganizations(supabase, user.id);
+  const { organizations: allOrganizations } = await getAccessibleOrganizations(supabase, user.id);
+  const organizations = allOrganizations.filter((organization) => organization.status === "active");
+  const heldOrganizations = allOrganizations.filter((organization) => organization.status === "held");
   const cookieStore = await cookies();
   const activeOrgId = resolveActiveOrgId(cookieStore.get("active_org_id")?.value, organizations);
   const organizationIds = activeOrgId ? [activeOrgId] : organizations.map((organization) => organization.id);
@@ -73,7 +75,13 @@ export default async function Home() {
         {!hasOrganization ? (
           <>
             <section className="rounded-3xl bg-slate-950 p-8 text-white sm:p-10">
-              {pendingRequest ? (
+              {heldOrganizations.length > 0 ? (
+                <>
+                  <p className="text-sm font-semibold text-amber-300">Access held</p>
+                  <h1 className="mt-3 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">접근이 일시 정지되었습니다.</h1>
+                  <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">{heldOrganizations.map((organization) => organization.name).join(", ")}에 대한 접근이 관리자에 의해 보류되었습니다. 재개가 필요하면 관리자에게 문의해 주세요.</p>
+                </>
+              ) : pendingRequest ? (
                 <>
                   <p className="text-sm font-semibold text-blue-300">Access request pending</p>
                   <h1 className="mt-3 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">가입 신청이 접수되어 검토 중입니다.</h1>
