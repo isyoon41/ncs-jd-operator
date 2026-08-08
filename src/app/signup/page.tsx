@@ -70,6 +70,11 @@ export default function SignupPage() {
       return;
     }
 
+    if (data.user && data.user.identities?.length === 0) {
+      setError("이미 가입된 이메일입니다. 로그인해 주세요.");
+      return;
+    }
+
     if (data.session) {
       const { error: requestError } = await supabase.rpc("request_organization_access", { company_name: companyName });
       if (requestError) {
