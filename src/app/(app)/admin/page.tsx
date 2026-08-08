@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 import { MembersPanel } from "@/components/admin/members-panel";
 import { AccessRequestsPanel } from "@/components/admin/access-requests-panel";
+import { PageContainer } from "@/components/layout/page-container";
+import { PageHeader } from "@/components/layout/page-header";
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -52,11 +54,15 @@ export default async function AdminPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-12">
-      <h1 className="text-2xl font-bold text-slate-900">마스터 관리자</h1>
-      <p className="mt-1 text-sm text-slate-500">가입 신청 승인, 회원 관리, 회사·초대 운영을 한 곳에서 처리하세요.</p>
+    <PageContainer>
+      <PageHeader
+        backHref="/"
+        eyebrow="Platform admin"
+        title="마스터 관리자"
+        description="가입 신청 승인, 회원 관리, 회사·초대 운영을 한 곳에서 처리하세요."
+      />
 
-      <div className="mt-8 space-y-10">
+      <div className="space-y-10">
         <AccessRequestsPanel initialAccessRequests={pendingRequests ?? []} organizations={organizationOptions} />
 
         {membersError ? (
@@ -71,6 +77,6 @@ export default async function AdminPage() {
           isSuperAdmin={Boolean(isAdmin)}
         />
       </div>
-    </div>
+    </PageContainer>
   );
 }

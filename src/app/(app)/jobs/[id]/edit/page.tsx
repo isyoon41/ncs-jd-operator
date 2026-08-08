@@ -1,9 +1,10 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, RefreshCw, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/database.types";
 import { JdRefineForm } from "@/components/jobs/jd-refine-form";
+import { PageContainer } from "@/components/layout/page-container";
+import { PageHeader } from "@/components/layout/page-header";
 
 export const maxDuration = 300;
 
@@ -60,27 +61,36 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
   const teamCharter = record(role.teams?.charter ?? {});
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-5xl px-5 py-8 sm:px-8">
-        <Link href={`/jobs/${id}`} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-900"><ArrowLeft className="h-4 w-4" />v{version.version_major}.{version.version_minor}으로 돌아가기</Link>
-        <header className="mb-8 mt-6 rounded-3xl bg-slate-950 p-7 text-white sm:p-9"><div className="flex items-center gap-2 text-blue-300"><RefreshCw className="h-4 w-4" /><p className="text-sm font-bold">Optional refinement · NCS re-validation</p></div><h1 className="mt-3 text-3xl font-black tracking-tight">직무기술서 v1.1 만들기</h1><p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">{role.teams?.organizations?.name} · {role.teams?.name} · 자동 생성된 v1.0을 그대로 사용할 수도 있습니다. 회사 고유 정보를 더 반영하고 싶은 항목만 수정하면 Gemini가 NCS 근거를 다시 검토합니다.</p><div className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold"><Sparkles className="h-3.5 w-3.5 text-blue-300" />기존 v1.0은 설계 스냅샷으로 보존됩니다</div></header>
-        {hasNewerProfile && <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm leading-6 text-blue-800">회사 프로필이 v{usedProfileVersion} → v{latestOrgProfileVersion}로 업데이트되었습니다. 이번 v1.1 보완에는 최신 프로필이 반영됩니다.</div>}
-        <JdRefineForm roleId={id} content={{
-          teamMission: typeof snapshot.teamMission === "string" ? snapshot.teamMission : role.teams?.mission ?? "",
-          teamOutputs: strings(snapshot.teamOutputs ?? teamCharter.outputs),
-          teamResponsibilities: strings(snapshot.teamResponsibilities ?? teamCharter.responsibilities),
-          suggestedRoles: roleTitles(snapshot.suggestedRoles ?? teamCharter.suggestedRoles),
-          roleTitle: typeof primaryRole.title === "string" ? primaryRole.title : role.title,
-          mission: byKind("mission")[0] ?? "",
-          outputs: strings(primaryRole.outputs ?? intake.outputs),
-          responsibilities: byKind("responsibility"),
-          requiredQualifications: byKind("qualification_required"),
-          preferredQualifications: byKind("qualification_preferred"),
-          tools: strings(primaryRole.tools ?? intake.tools),
-          stakeholders: strings(primaryRole.stakeholders ?? intake.stakeholders),
-          kpis: byKind("kpi"),
-        }} />
-      </div>
-    </main>
+    <PageContainer>
+      <PageHeader
+        backHref={`/jobs/${id}`}
+        backLabel={`v${version.version_major}.${version.version_minor}으로 돌아가기`}
+        eyebrow="Optional refinement · NCS re-validation"
+        title="직무기술서 v1.1 만들기"
+        description={`${role.teams?.organizations?.name} · ${role.teams?.name} · 자동 생성된 v1.0을 그대로 사용할 수도 있습니다. 회사 고유 정보를 더 반영하고 싶은 항목만 수정하면 Gemini가 NCS 근거를 다시 검토합니다.`}
+        action={
+          <span className="inline-flex shrink-0 items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">
+            <Sparkles className="h-3.5 w-3.5" />
+            기존 v1.0은 설계 스냅샷으로 보존됩니다
+          </span>
+        }
+      />
+      {hasNewerProfile && <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm leading-6 text-blue-800">회사 프로필이 v{usedProfileVersion} → v{latestOrgProfileVersion}로 업데이트되었습니다. 이번 v1.1 보완에는 최신 프로필이 반영됩니다.</div>}
+      <JdRefineForm roleId={id} content={{
+        teamMission: typeof snapshot.teamMission === "string" ? snapshot.teamMission : role.teams?.mission ?? "",
+        teamOutputs: strings(snapshot.teamOutputs ?? teamCharter.outputs),
+        teamResponsibilities: strings(snapshot.teamResponsibilities ?? teamCharter.responsibilities),
+        suggestedRoles: roleTitles(snapshot.suggestedRoles ?? teamCharter.suggestedRoles),
+        roleTitle: typeof primaryRole.title === "string" ? primaryRole.title : role.title,
+        mission: byKind("mission")[0] ?? "",
+        outputs: strings(primaryRole.outputs ?? intake.outputs),
+        responsibilities: byKind("responsibility"),
+        requiredQualifications: byKind("qualification_required"),
+        preferredQualifications: byKind("qualification_preferred"),
+        tools: strings(primaryRole.tools ?? intake.tools),
+        stakeholders: strings(primaryRole.stakeholders ?? intake.stakeholders),
+        kpis: byKind("kpi"),
+      }} />
+    </PageContainer>
   );
 }

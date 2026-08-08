@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getAccessibleOrganizations, resolveActiveOrgId } from "@/lib/org/active-organization";
 import { JdCreateForm } from "@/components/jobs/jd-create-form";
+import { PageContainer } from "@/components/layout/page-container";
+import { PageHeader } from "@/components/layout/page-header";
 
 export const maxDuration = 300;
 
@@ -25,5 +25,15 @@ export default async function NewJobPage() {
     .order("version_no", { ascending: false });
   const profiles = [...new Map((profileRows ?? []).map((profile) => [profile.organization_id, profile])).values()];
 
-  return <main className="min-h-screen bg-slate-50"><div className="mx-auto max-w-7xl px-5 py-8 sm:px-8"><Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-900"><ArrowLeft className="h-4 w-4" />대시보드</Link><div className="mb-8 mt-6"><p className="text-sm font-semibold text-blue-600">Company-grounded job design</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">회사 이해에서 시작하는 직무설계</h1><p className="mt-3 max-w-3xl text-base leading-7 text-slate-500">회사 소개자료와 간단한 팀 역할만 알려주세요. Gemini가 회사를 이해하고 NCS로 근거를 검토해 바로 사용할 수 있는 직무기술서 v1.0을 만듭니다.</p></div><JdCreateForm organizations={organizations} profiles={profiles} defaultOrganizationId={activeOrgId} /></div></main>;
+  return (
+    <PageContainer wide>
+      <PageHeader
+        backHref="/"
+        eyebrow="Company-grounded job design"
+        title="회사 이해에서 시작하는 직무설계"
+        description="회사 소개자료와 간단한 팀 역할만 알려주세요. Gemini가 회사를 이해하고 NCS로 근거를 검토해 바로 사용할 수 있는 직무기술서 v1.0을 만듭니다."
+      />
+      <JdCreateForm organizations={organizations} profiles={profiles} defaultOrganizationId={activeOrgId} />
+    </PageContainer>
+  );
 }

@@ -22,6 +22,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/database.types";
 import { JdPdfDownloadButton } from "@/components/jobs/jd-pdf-download-button";
 import type { JdPdfData } from "@/lib/pdf/jd-document";
+import { PageContainer } from "@/components/layout/page-container";
 
 const labels = {
   mission: "직무 미션",
@@ -141,8 +142,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   };
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8">
+    <PageContainer wide>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-900"><ArrowLeft className="h-4 w-4" />대시보드</Link>
           <div className="flex gap-2"><JdPdfDownloadButton data={pdfData} />{canCreateV11 && <Link href={`/jobs/${id}/edit`} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-blue-200 hover:text-blue-700"><Pencil className="h-4 w-4" />v1.1 보완하기</Link>}<Link href="/jobs/new" className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white"><Plus className="h-4 w-4" />{isGroundedVersion ? "새 직무설계" : "새 방식으로 재설계"}</Link></div>
@@ -179,8 +179,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             {canCreateV11 ? <Link href={`/jobs/${id}/edit`} className="flex items-center justify-between rounded-2xl bg-blue-600 p-5 text-white shadow-lg shadow-blue-600/20"><div><p className="text-sm font-black">회사 고유 정보를 더 반영하시겠어요?</p><p className="mt-1 text-xs text-blue-100">선택 입력 후 NCS 재검토로 v1.1 생성</p></div><ArrowRight className="h-5 w-5" /></Link> : isGroundedVersion ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5"><p className="text-sm font-black text-emerald-900">v1.1 검토 완료</p><p className="mt-1 text-xs leading-5 text-emerald-700">회사 고유 정보와 NCS 근거를 다시 검토한 현재 완성본입니다.</p></div> : <Link href="/jobs/new" className="flex items-center justify-between rounded-2xl bg-blue-600 p-5 text-white shadow-lg shadow-blue-600/20"><div><p className="text-sm font-black">회사 맥락부터 다시 설계하세요</p><p className="mt-1 text-xs text-blue-100">새 근거 루프로 검증된 v1.0 생성</p></div><ArrowRight className="h-5 w-5" /></Link>}
           </aside>
         </div>
-      </div>
-    </main>
+    </PageContainer>
   );
 }
 

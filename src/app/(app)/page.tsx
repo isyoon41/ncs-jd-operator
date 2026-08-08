@@ -15,6 +15,8 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getAccessibleOrganizations, resolveActiveOrgId } from "@/lib/org/active-organization";
 import { AccessRequestForm } from "@/components/onboarding/access-request-form";
+import { PageContainer } from "@/components/layout/page-container";
+import { RoleCard } from "@/components/dashboard/role-card";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -41,11 +43,24 @@ export default async function Home() {
     .flatMap((team) =>
       team.team_roles.map((role) => ({
         ...role,
+        teamId: team.id,
         teamName: team.name,
         organization: organizations.find((item) => item.id === team.organization_id),
       })),
     )
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  const draftRoles = roles.filter((role) => role.status !== "approved");
+  const confirmedRoles = roles.filter((role) => role.status === "approved");
+  const confirmedByTeam = [
+    ...confirmedRoles
+      .reduce((groups, role) => {
+        const group = groups.get(role.teamId) ?? { teamId: role.teamId, teamName: role.teamName, organizationName: role.organization?.name, roles: [] as typeof confirmedRoles };
+        group.roles.push(role);
+        groups.set(role.teamId, group);
+        return groups;
+      }, new Map<string, { teamId: string; teamName: string; organizationName?: string; roles: typeof confirmedRoles }>())
+      .values(),
+  ];
 
   const { data: profileRows } = organizationIds.length
     ? await supabase
@@ -70,9 +85,8 @@ export default async function Home() {
   const pendingRequest = pendingRequests?.[0] ?? null;
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
-        {!hasOrganization ? (
+    <PageContainer>
+      {!hasOrganization ? (
           <>
             <section className="rounded-3xl bg-slate-950 p-8 text-white sm:p-10">
               {heldOrganizations.length > 0 ? (
@@ -113,7 +127,7 @@ export default async function Home() {
               <Metric icon={<Building2 className="h-5 w-5" />} label="연결된 기업" value={String(organizations.length)} detail={organizations[0]?.name} />
               <Metric icon={<ShieldCheck className="h-5 w-5" />} label="회사 프로필 준비" value={String(latestProfiles.length)} detail="Gemini 분석 완료" />
               <Metric icon={<Users className="h-5 w-5" />} label="등록 팀" value={String(teams?.length ?? 0)} detail="조직 구조" />
-              <Metric icon={<FileText className="h-5 w-5" />} label="직무기술서" value={String(roles.length)} detail={`${approvedCount}개 승인`} />
+              <Metric icon={<FileText className="h-5 w-5" />} label="직무기술서" value={String(roles.length)} detail={`${approvedCount}개 확정`} />
             </section>
 
             <WorkflowOverview />
@@ -129,23 +143,52 @@ export default async function Home() {
                   <p className="mt-2 text-sm text-slate-400">회사 자료와 팀 역할을 바탕으로 NCS 검토가 완료된 v1.0을 만듭니다.</p>
                   <Link href="/jobs/new" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-blue-600">v1.0 만들기<ArrowRight className="h-4 w-4" /></Link>
                 </div>
+              ) : draftRoles.length === 0 ? (
+                <p className="mt-5 text-sm text-slate-400">현재 작성 중인 직무기술서가 없습니다. 확정된 직무기술서는 아래 팀별 보관함에서 볼 수 있습니다.</p>
               ) : (
                 <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {roles.slice(0, 12).map((role) => (
-                    <Link key={role.id} href={`/jobs/${role.id}`} className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
-                      <div className="flex items-center justify-between"><span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">{role.status === "draft" ? "초안" : role.status}</span><ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-1 group-hover:text-blue-500" /></div>
-                      <h3 className="mt-4 text-lg font-bold text-slate-900">{role.title}</h3>
-                      <p className="mt-1 text-sm text-slate-400">{role.organization?.name} · {role.teamName}</p>
-                      {role.seniority_hint && <p className="mt-4 text-xs font-medium text-slate-500">{role.seniority_hint}</p>}
-                    </Link>
+                  {draftRoles.slice(0, 12).map((role) => (
+                    <RoleCard
+                      key={role.id}
+                      role={{ ...role, organizationName: role.organization?.name }}
+                      showConfirm
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="mt-10">
+              <div className="flex items-end justify-between">
+                <div><p className="text-sm font-semibold text-blue-600">Confirmed archive</p><h2 className="mt-1 text-2xl font-bold text-slate-950">팀별 확정 직무기술서</h2></div>
+              </div>
+              {confirmedByTeam.length === 0 ? (
+                <p className="mt-5 text-sm text-slate-400">아직 확정된 직무기술서가 없습니다. 직무기술서에서 &ldquo;확정&rdquo;을 누르면 팀별로 여기에 보관됩니다.</p>
+              ) : (
+                <div className="mt-5 space-y-8">
+                  {confirmedByTeam.map((group) => (
+                    <div key={group.teamId}>
+                      <h3 className="text-sm font-bold text-slate-700">
+                        {group.organizationName} · {group.teamName}
+                        <span className="ml-2 text-xs font-medium text-slate-400">{group.roles.length}건</span>
+                      </h3>
+                      <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {group.roles.map((role) => (
+                          <RoleCard
+                            key={role.id}
+                            role={{ ...role, organizationName: role.organization?.name }}
+                            showConfirm={false}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
             </section>
           </>
         )}
-      </div>
-    </main>
+    </PageContainer>
   );
 }
 
