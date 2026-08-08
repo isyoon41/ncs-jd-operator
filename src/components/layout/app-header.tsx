@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Building2, LogOut, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { setActiveOrganization } from "@/app/(app)/actions";
@@ -42,9 +43,14 @@ export function AppHeader({
   return (
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-8">
-        <Link href="/" className="block">
-          <p className="text-lg font-black tracking-tight text-slate-950">NCS JD Operator</p>
-          <p className="text-xs text-slate-400">근거 기반 직무기술서</p>
+        <Link href="/" className="flex items-center gap-3">
+          <span className="grid h-10 w-11 shrink-0 place-items-center overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+            <Image src="/brand/pathway-partners-mark.png" alt="" width={294} height={268} className="h-full w-full object-contain" priority />
+          </span>
+          <span className="block">
+            <span className="block text-lg font-black tracking-tight text-slate-950">NCS JD Operator</span>
+            <span className="mt-0.5 block text-[10px] font-bold tracking-[0.14em] text-[#806744]">A PATHWAY PARTNERS PRODUCT</span>
+          </span>
         </Link>
         <div className="flex flex-wrap items-center gap-4">
           {organizations.length > 1 ? (

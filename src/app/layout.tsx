@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NCS 직무기술서 생성기",
-  description: "NCS 기반 근거형 직무기술서(JD) 생성 플랫폼",
+  title: "NCS JD Operator | Pathway Partners",
+  description: "PATHWAY Partners가 만든 NCS 기반 근거형 직무기술서(JD) 생성 플랫폼",
+  applicationName: "NCS JD Operator",
 };
 
 export default function RootLayout({
