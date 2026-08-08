@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { createJdDraft, type CreateJdState } from "@/app/jobs/new/actions";
+import { createJdDraft, type CreateJdState } from "@/app/(app)/jobs/new/actions";
 
 type Organization = { id: string; name: string };
 type CompanyProfile = { organization_id: string; version_no: number; summary: string };
@@ -30,9 +30,17 @@ function StepTitle({ number, icon, eyebrow, title, text }: { number: string; ico
   return <div className="mb-7 flex items-start gap-4"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-blue-50 text-blue-600">{icon}</span><div><p className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">{number} · {eyebrow}</p><h2 className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">{title}</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{text}</p></div></div>;
 }
 
-export function JdCreateForm({ organizations, profiles }: { organizations: Organization[]; profiles: CompanyProfile[] }) {
+export function JdCreateForm({
+  organizations,
+  profiles,
+  defaultOrganizationId,
+}: {
+  organizations: Organization[];
+  profiles: CompanyProfile[];
+  defaultOrganizationId?: string | null;
+}) {
   const [state, formAction, pending] = useActionState(createJdDraft, initialState);
-  const [organizationId, setOrganizationId] = useState(organizations[0]?.id ?? "");
+  const [organizationId, setOrganizationId] = useState(defaultOrganizationId ?? organizations[0]?.id ?? "");
   const currentProfile = useMemo(() => profiles.find((profile) => profile.organization_id === organizationId), [profiles, organizationId]);
   const [showNewSource, setShowNewSource] = useState(false);
 

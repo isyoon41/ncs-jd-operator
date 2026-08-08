@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { Building2, Check, LoaderCircle, RefreshCw, Save, Sparkles, Target, Users } from "lucide-react";
-import { refineJdDraft, type RefineJdState } from "@/app/jobs/[id]/edit/actions";
+import { refineJdDraft, type RefineJdState } from "@/app/(app)/jobs/[id]/edit/actions";
 
 type DraftContent = {
   teamMission: string;

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import {
   ArrowRight,
   Building2,
@@ -12,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getAccessibleOrganizations, resolveActiveOrgId } from "@/lib/org/active-organization";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -20,18 +22,10 @@ export default async function Home() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: isSuperAdmin } = await supabase.rpc("is_platform_admin");
-  const organizations = isSuperAdmin
-    ? ((await supabase.from("organizations").select("id, name, slug").order("name")).data ?? [])
-        .map((organization) => ({ ...organization, memberRole: "super_admin" as const }))
-    : ((await supabase
-        .from("organization_members")
-        .select("organization_id, role, organizations(id, name, slug)")
-        .eq("user_id", user.id)).data ?? [])
-        .flatMap((membership) =>
-          membership.organizations ? [{ ...membership.organizations, memberRole: membership.role }] : [],
-        );
-  const organizationIds = organizations.map((organization) => organization.id);
+  const { organizations } = await getAccessibleOrganizations(supabase, user.id);
+  const cookieStore = await cookies();
+  const activeOrgId = resolveActiveOrgId(cookieStore.get("active_org_id")?.value, organizations);
+  const organizationIds = activeOrgId ? [activeOrgId] : organizations.map((organization) => organization.id);
 
   const { data: teams } = organizationIds.length
     ? await supabase
@@ -63,18 +57,6 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
-          <div>
-            <p className="text-lg font-black tracking-tight text-slate-950">NCS JD Operator</p>
-            <p className="text-xs text-slate-400">근거 기반 직무기술서</p>
-          </div>
-          <Link href="/admin" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-900">
-            <ShieldCheck className="h-4 w-4" />관리
-          </Link>
-        </div>
-      </header>
-
       <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
         {!hasOrganization ? (
           <>
@@ -90,7 +72,7 @@ export default async function Home() {
           <>
             <section className="flex flex-col justify-between gap-6 rounded-3xl bg-slate-950 p-8 text-white sm:flex-row sm:items-end sm:p-10">
               <div>
-                <p className="text-sm font-semibold text-blue-300">{organizations.length > 1 ? `${organizations.length}개 회사 접근 권한` : `${organizations[0]?.name} Workspace`}{isSuperAdmin ? " · Super Admin" : ""}</p>
+                <p className="text-sm font-semibold text-blue-300">{activeOrgId ? organizations.find((organization) => organization.id === activeOrgId)?.name : organizations.length > 1 ? `${organizations.length}개 회사 통합 보기` : organizations[0]?.name} Workspace</p>
                 <h1 className="mt-3 max-w-3xl text-3xl font-bold tracking-tight sm:text-4xl">회사를 이해한 AI가 NCS 근거로 직무를 설계합니다.</h1>
                 <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">회사 소개자료와 간단한 팀 역할만 입력하면 Gemini가 팀 구조와 직무기술서 v1.0을 만들고 NCS 근거 루프로 다시 검토합니다.</p>
               </div>
