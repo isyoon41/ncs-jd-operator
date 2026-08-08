@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getAccessibleOrganizations, resolveActiveOrgId } from "@/lib/org/active-organization";
+import { AccessRequestForm } from "@/components/onboarding/access-request-form";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -55,16 +56,37 @@ export default async function Home() {
   const approvedCount = roles.filter((role) => role.status === "approved").length;
   const hasOrganization = organizations.length > 0;
 
+  const { data: pendingRequests } = hasOrganization
+    ? { data: [] }
+    : await supabase
+        .from("organization_access_requests")
+        .select("id, requested_organization_name")
+        .eq("user_id", user.id)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(1);
+  const pendingRequest = pendingRequests?.[0] ?? null;
+
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
         {!hasOrganization ? (
           <>
             <section className="rounded-3xl bg-slate-950 p-8 text-white sm:p-10">
-              <p className="text-sm font-semibold text-blue-300">Workspace connection required</p>
-              <h1 className="mt-3 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">만든 회사를 실제 작업 공간으로 연결하세요.</h1>
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">회사 생성과 조직 가입은 분리되어 있습니다. 관리자 화면에서 소속 회사의 ‘내 계정 연결’을 누르면 초대 로직을 통해 안전하게 조직 멤버가 되고, 아래 기능이 활성화됩니다.</p>
-              <Link href="/admin" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500">회사 연결하기<ArrowRight className="h-4 w-4" /></Link>
+              {pendingRequest ? (
+                <>
+                  <p className="text-sm font-semibold text-blue-300">Access request pending</p>
+                  <h1 className="mt-3 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">가입 신청이 접수되어 검토 중입니다.</h1>
+                  <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">신청하신 회사({pendingRequest.requested_organization_name})의 관리자가 승인하면 자동으로 작업 공간이 열립니다. 승인 전까지는 별도로 하실 일이 없습니다.</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-blue-300">Workspace connection required</p>
+                  <h1 className="mt-3 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">소속 회사를 신청하고 관리자 승인을 받으세요.</h1>
+                  <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">회사명을 입력해 신청하면, 관리자가 확인 후 승인합니다. 승인되면 아래 기능이 자동으로 활성화됩니다.</p>
+                  <div className="mt-7 max-w-sm"><AccessRequestForm /></div>
+                </>
+              )}
             </section>
             <WorkflowOverview disabled />
           </>

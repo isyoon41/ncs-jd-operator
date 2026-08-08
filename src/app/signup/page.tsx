@@ -3,15 +3,32 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Mail, Lock, User } from "lucide-react";
+import { Building2, Mail, Lock, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { AuthInput } from "@/components/auth/auth-input";
+
+const PERSONAL_EMAIL_DOMAINS = new Set([
+  "gmail.com",
+  "naver.com",
+  "daum.net",
+  "hanmail.net",
+  "kakao.com",
+  "nate.com",
+  "yahoo.com",
+  "yahoo.co.kr",
+  "outlook.com",
+  "hotmail.com",
+  "icloud.com",
+  "live.com",
+  "msn.com",
+]);
 
 export default function SignupPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,6 +47,11 @@ export default function SignupPage() {
       setError("비밀번호는 8자 이상이어야 합니다.");
       return;
     }
+    const domain = email.split("@")[1]?.toLowerCase();
+    if (domain && PERSONAL_EMAIL_DOMAINS.has(domain)) {
+      setError("개인 이메일이 아닌 회사 이메일로 가입해 주세요.");
+      return;
+    }
 
     setLoading(true);
     const supabase = createClient();
@@ -38,7 +60,7 @@ export default function SignupPage() {
       password,
       options: {
         data: { display_name: name },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(`/signup/finish?company=${encodeURIComponent(companyName)}`)}`,
       },
     });
     setLoading(false);
@@ -49,6 +71,11 @@ export default function SignupPage() {
     }
 
     if (data.session) {
+      const { error: requestError } = await supabase.rpc("request_organization_access", { company_name: companyName });
+      if (requestError) {
+        setError(requestError.message);
+        return;
+      }
       router.push("/");
       router.refresh();
       return;
@@ -100,6 +127,16 @@ export default function SignupPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@company.com"
+        />
+        <AuthInput
+          label="회사명"
+          icon={Building2}
+          type="text"
+          required
+          autoComplete="organization"
+          value={companyName}
+          onChange={(e) => setCompanyName(e.target.value)}
+          placeholder="예: 위즈덤앤코"
         />
         <AuthInput
           label="비밀번호"

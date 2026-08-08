@@ -25,11 +25,14 @@ export default async function AdminPage() {
     .select("organization_id")
     .eq("user_id", user.id);
 
+  const { data: pendingRequests } = await supabase.rpc("list_pending_access_requests");
+
   return (
     <AdminDashboard
       initialOrganizations={organizations ?? []}
       memberOrganizationIds={(memberships ?? []).map((item) => item.organization_id)}
       isSuperAdmin={Boolean(isAdmin)}
+      initialAccessRequests={pendingRequests ?? []}
     />
   );
 }

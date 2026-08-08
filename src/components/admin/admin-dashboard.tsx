@@ -2,8 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Copy, Check, Ban, ArrowRight, Building2, LoaderCircle } from "lucide-react";
+import { Plus, Copy, Check, Ban, ArrowRight, Building2, LoaderCircle, UserCheck, UserX } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+
+interface AccessRequest {
+  request_id: string;
+  user_email: string;
+  requested_organization_name: string;
+  requested_role: "owner" | "admin" | "member";
+  created_at: string;
+}
 
 interface Invite {
   id: string;
@@ -35,10 +43,12 @@ export function AdminDashboard({
   initialOrganizations,
   memberOrganizationIds,
   isSuperAdmin,
+  initialAccessRequests,
 }: {
   initialOrganizations: Organization[];
   memberOrganizationIds: string[];
   isSuperAdmin: boolean;
+  initialAccessRequests: AccessRequest[];
 }) {
   const router = useRouter();
   const [newOrgName, setNewOrgName] = useState("");
@@ -46,6 +56,39 @@ export function AdminDashboard({
   const [error, setError] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [connectingOrgId, setConnectingOrgId] = useState<string | null>(null);
+  const [selectedOrgByRequest, setSelectedOrgByRequest] = useState<Record<string, string>>({});
+  const [reviewingRequestId, setReviewingRequestId] = useState<string | null>(null);
+
+  async function handleApproveRequest(requestId: string) {
+    const targetOrgId = selectedOrgByRequest[requestId];
+    if (!targetOrgId) {
+      setError("연결할 회사를 먼저 선택해 주세요.");
+      return;
+    }
+    setError(null);
+    setReviewingRequestId(requestId);
+    const supabase = createClient();
+    const { error } = await supabase.rpc("approve_access_request", { request_id: requestId, target_org_id: targetOrgId });
+    setReviewingRequestId(null);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    router.refresh();
+  }
+
+  async function handleRejectRequest(requestId: string) {
+    setError(null);
+    setReviewingRequestId(requestId);
+    const supabase = createClient();
+    const { error } = await supabase.rpc("reject_access_request", { request_id: requestId });
+    setReviewingRequestId(null);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    router.refresh();
+  }
 
   async function handleCreateOrg(e: React.FormEvent) {
     e.preventDefault();
@@ -125,6 +168,50 @@ export function AdminDashboard({
     <div className="mx-auto max-w-3xl px-6 py-12">
       <h1 className="text-2xl font-bold text-slate-900">마스터 관리자</h1>
       <p className="mt-1 text-sm text-slate-500">회사를 만들고, 초대 링크 또는 작업 공간 연결로 운영을 시작하세요.</p>
+
+      {initialAccessRequests.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-sm font-bold text-slate-700">가입 신청 ({initialAccessRequests.length})</h2>
+          <div className="mt-3 space-y-3">
+            {initialAccessRequests.map((request) => (
+              <div key={request.request_id} className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{request.user_email}</p>
+                    <p className="text-xs text-slate-500">신청 회사: {request.requested_organization_name} · {new Date(request.created_at).toLocaleDateString("ko-KR")}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedOrgByRequest[request.request_id] ?? ""}
+                      onChange={(e) => setSelectedOrgByRequest((current) => ({ ...current, [request.request_id]: e.target.value }))}
+                      className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-700"
+                    >
+                      <option value="">연결할 회사 선택</option>
+                      {initialOrganizations.map((org) => (
+                        <option key={org.id} value={org.id}>{org.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => handleApproveRequest(request.request_id)}
+                      disabled={reviewingRequestId === request.request_id}
+                      className="flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                    >
+                      <UserCheck className="h-3.5 w-3.5" />승인
+                    </button>
+                    <button
+                      onClick={() => handleRejectRequest(request.request_id)}
+                      disabled={reviewingRequestId === request.request_id}
+                      className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+                    >
+                      <UserX className="h-3.5 w-3.5" />거절
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleCreateOrg} className="mt-8 flex gap-2">
         <input

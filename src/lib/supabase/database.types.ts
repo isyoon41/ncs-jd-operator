@@ -307,6 +307,50 @@ export type Database = {
           },
         ]
       }
+      organization_access_requests: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string | null
+          requested_organization_name: string
+          requested_role: Database["public"]["Enums"]["org_role"]
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          requested_organization_name: string
+          requested_role?: Database["public"]["Enums"]["org_role"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          requested_organization_name?: string
+          requested_role?: Database["public"]["Enums"]["org_role"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_access_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_invites: {
         Row: {
           created_at: string
@@ -701,6 +745,10 @@ export type Database = {
     }
     Functions: {
       accept_invite: { Args: { invite_token: string }; Returns: string }
+      approve_access_request: {
+        Args: { request_id: string; target_org_id: string }
+        Returns: undefined
+      }
       create_invite: {
         Args: {
           expires_in_days?: number
@@ -727,6 +775,27 @@ export type Database = {
       is_org_admin: { Args: { target_org_id: string }; Returns: boolean }
       is_org_member: { Args: { target_org_id: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
+      list_pending_access_requests: {
+        Args: never
+        Returns: {
+          created_at: string
+          request_id: string
+          requested_organization_name: string
+          requested_role: Database["public"]["Enums"]["org_role"]
+          user_email: string
+        }[]
+      }
+      reject_access_request: {
+        Args: { request_id: string }
+        Returns: undefined
+      }
+      request_organization_access: {
+        Args: {
+          company_name: string
+          requested_role?: Database["public"]["Enums"]["org_role"]
+        }
+        Returns: string
+      }
     }
     Enums: {
       evidence_source: "ncs" | "user_input" | "uploaded_jd"
