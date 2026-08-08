@@ -52,3 +52,47 @@ export async function deleteUserAccount(userId: string): Promise<AdminActionStat
   if (error) return { error: error.message };
   return { error: null };
 }
+
+export async function changeUserOrganization(
+  userId: string,
+  targetOrgId: string | null,
+  role: "owner" | "admin" | "member" = "member",
+): Promise<AdminActionState> {
+  const { supabase, isAdmin } = await requirePlatformAdmin();
+  if (!isAdmin) return { error: "관리자 권한이 없습니다." };
+
+  const { error: deleteError } = await supabase.from("organization_members").delete().eq("user_id", userId);
+  if (deleteError) return { error: deleteError.message };
+
+  if (targetOrgId) {
+    const { error: insertError } = await supabase
+      .from("organization_members")
+      .insert({ organization_id: targetOrgId, user_id: userId, role });
+    if (insertError) return { error: insertError.message };
+  }
+  return { error: null };
+}
+
+function slugify(name: string) {
+  const slug = name.trim().toLowerCase().replace(/[^a-z0-9가-힣]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || `org-${Date.now()}`;
+}
+
+export async function approveAccessRequestWithNewOrg(requestId: string, companyName: string): Promise<AdminActionState> {
+  const { supabase, isAdmin } = await requirePlatformAdmin();
+  if (!isAdmin) return { error: "관리자 권한이 없습니다." };
+  if (!companyName.trim()) return { error: "회사명을 입력해 주세요." };
+
+  const { data: newOrgId, error: createError } = await supabase.rpc("create_organization_as_admin", {
+    org_name: companyName,
+    org_slug: slugify(companyName),
+  });
+  if (createError) return { error: createError.message };
+
+  const { error: approveError } = await supabase.rpc("approve_access_request", {
+    request_id: requestId,
+    target_org_id: newOrgId as string,
+  });
+  if (approveError) return { error: approveError.message };
+  return { error: null };
+}

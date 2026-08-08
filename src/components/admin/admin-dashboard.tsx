@@ -2,16 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Copy, Check, Ban, ArrowRight, Building2, LoaderCircle, UserCheck, UserX } from "lucide-react";
+import { Plus, Copy, Check, Ban, ArrowRight, Building2, LoaderCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-
-interface AccessRequest {
-  request_id: string;
-  user_email: string;
-  requested_organization_name: string;
-  requested_role: "owner" | "admin" | "member";
-  created_at: string;
-}
+import { adminButtonClass, adminCardClass, adminInputClass, adminSectionTitleClass } from "@/components/admin/ui";
 
 interface Invite {
   id: string;
@@ -43,12 +36,10 @@ export function AdminDashboard({
   initialOrganizations,
   memberOrganizationIds,
   isSuperAdmin,
-  initialAccessRequests,
 }: {
   initialOrganizations: Organization[];
   memberOrganizationIds: string[];
   isSuperAdmin: boolean;
-  initialAccessRequests: AccessRequest[];
 }) {
   const router = useRouter();
   const [newOrgName, setNewOrgName] = useState("");
@@ -56,39 +47,6 @@ export function AdminDashboard({
   const [error, setError] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [connectingOrgId, setConnectingOrgId] = useState<string | null>(null);
-  const [selectedOrgByRequest, setSelectedOrgByRequest] = useState<Record<string, string>>({});
-  const [reviewingRequestId, setReviewingRequestId] = useState<string | null>(null);
-
-  async function handleApproveRequest(requestId: string) {
-    const targetOrgId = selectedOrgByRequest[requestId];
-    if (!targetOrgId) {
-      setError("연결할 회사를 먼저 선택해 주세요.");
-      return;
-    }
-    setError(null);
-    setReviewingRequestId(requestId);
-    const supabase = createClient();
-    const { error } = await supabase.rpc("approve_access_request", { request_id: requestId, target_org_id: targetOrgId });
-    setReviewingRequestId(null);
-    if (error) {
-      setError(error.message);
-      return;
-    }
-    router.refresh();
-  }
-
-  async function handleRejectRequest(requestId: string) {
-    setError(null);
-    setReviewingRequestId(requestId);
-    const supabase = createClient();
-    const { error } = await supabase.rpc("reject_access_request", { request_id: requestId });
-    setReviewingRequestId(null);
-    if (error) {
-      setError(error.message);
-      return;
-    }
-    router.refresh();
-  }
 
   async function handleCreateOrg(e: React.FormEvent) {
     e.preventDefault();
@@ -165,66 +123,21 @@ export function AdminDashboard({
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-12">
-      <h1 className="text-2xl font-bold text-slate-900">마스터 관리자</h1>
-      <p className="mt-1 text-sm text-slate-500">회사를 만들고, 초대 링크 또는 작업 공간 연결로 운영을 시작하세요.</p>
+    <div>
+      <h2 className={adminSectionTitleClass}>회사 · 초대 관리</h2>
 
-      {initialAccessRequests.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-sm font-bold text-slate-700">가입 신청 ({initialAccessRequests.length})</h2>
-          <div className="mt-3 space-y-3">
-            {initialAccessRequests.map((request) => (
-              <div key={request.request_id} className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{request.user_email}</p>
-                    <p className="text-xs text-slate-500">신청 회사: {request.requested_organization_name} · {new Date(request.created_at).toLocaleDateString("ko-KR")}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={selectedOrgByRequest[request.request_id] ?? ""}
-                      onChange={(e) => setSelectedOrgByRequest((current) => ({ ...current, [request.request_id]: e.target.value }))}
-                      className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-700"
-                    >
-                      <option value="">연결할 회사 선택</option>
-                      {initialOrganizations.map((org) => (
-                        <option key={org.id} value={org.id}>{org.name}</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => handleApproveRequest(request.request_id)}
-                      disabled={reviewingRequestId === request.request_id}
-                      className="flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-                    >
-                      <UserCheck className="h-3.5 w-3.5" />승인
-                    </button>
-                    <button
-                      onClick={() => handleRejectRequest(request.request_id)}
-                      disabled={reviewingRequestId === request.request_id}
-                      className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
-                    >
-                      <UserX className="h-3.5 w-3.5" />거절
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <form onSubmit={handleCreateOrg} className="mt-8 flex gap-2">
+      <form onSubmit={handleCreateOrg} className="mt-3 flex gap-2">
         <input
           value={newOrgName}
           onChange={(e) => setNewOrgName(e.target.value)}
           placeholder="회사 이름 (예: 위즈덤앤코)"
           required
-          className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          className={`flex-1 ${adminInputClass}`}
         />
         <button
           type="submit"
           disabled={creating}
-          className="flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:opacity-60"
+          className={`flex items-center gap-1.5 whitespace-nowrap ${adminButtonClass.primary}`}
         >
           <Plus className="h-4 w-4" />
           {creating ? "생성 중..." : "회사 만들기"}
@@ -233,33 +146,33 @@ export function AdminDashboard({
 
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
-      <div className="mt-10 space-y-4">
+      <div className="mt-4 space-y-3">
         {initialOrganizations.length === 0 && (
           <p className="text-sm text-slate-400">아직 등록된 회사가 없습니다.</p>
         )}
         {initialOrganizations.map((org) => (
-          <div key={org.id} className="rounded-xl border border-slate-200 p-5">
+          <div key={org.id} className={adminCardClass}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <span className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-600">
                   <Building2 className="h-5 w-5" />
                 </span>
                 <div>
-                  <h2 className="font-semibold text-slate-900">{org.name}</h2>
+                  <h3 className="font-semibold text-slate-900">{org.name}</h3>
                   <p className="text-xs text-slate-400">{org.slug}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleCreateInvite(org.id)}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                  className={adminButtonClass.secondary}
                 >
                   초대 링크 만들기
                 </button>
                 <button
                   onClick={() => openWorkspace(org)}
                   disabled={connectingOrgId === org.id}
-                  className="flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+                  className={`flex items-center gap-1.5 ${adminButtonClass.primary}`}
                 >
                   {connectingOrgId === org.id ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
                   {isSuperAdmin || memberOrganizationIds.includes(org.id) ? "작업 공간 열기" : "내 계정 연결"}

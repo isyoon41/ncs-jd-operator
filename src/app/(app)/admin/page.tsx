@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 import { MembersPanel } from "@/components/admin/members-panel";
+import { AccessRequestsPanel } from "@/components/admin/access-requests-panel";
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -21,6 +22,7 @@ export default async function AdminPage() {
       "id, name, slug, created_at, organization_invites(id, token, role, is_revoked, expires_at, created_at)"
     )
     .order("created_at", { ascending: false });
+  const organizationOptions = (organizations ?? []).map((org) => ({ id: org.id, name: org.name }));
 
   const { data: memberships } = await supabase
     .from("organization_members")
@@ -50,20 +52,25 @@ export default async function AdminPage() {
   }
 
   return (
-    <>
-      <AdminDashboard
-        initialOrganizations={organizations ?? []}
-        memberOrganizationIds={(memberships ?? []).map((item) => item.organization_id)}
-        isSuperAdmin={Boolean(isAdmin)}
-        initialAccessRequests={pendingRequests ?? []}
-      />
-      <div className="mx-auto max-w-3xl px-6 pb-12">
+    <div className="mx-auto max-w-3xl px-6 py-12">
+      <h1 className="text-2xl font-bold text-slate-900">마스터 관리자</h1>
+      <p className="mt-1 text-sm text-slate-500">가입 신청 승인, 회원 관리, 회사·초대 운영을 한 곳에서 처리하세요.</p>
+
+      <div className="mt-8 space-y-10">
+        <AccessRequestsPanel initialAccessRequests={pendingRequests ?? []} organizations={organizationOptions} />
+
         {membersError ? (
-          <p className="mt-10 text-sm text-red-600">회원 목록을 불러오지 못했습니다: {membersError} (SUPABASE_SERVICE_ROLE_KEY 환경변수를 확인해 주세요)</p>
+          <p className="text-sm text-red-600">회원 목록을 불러오지 못했습니다: {membersError} (SUPABASE_SERVICE_ROLE_KEY 환경변수를 확인해 주세요)</p>
         ) : (
-          <MembersPanel users={authUsers} memberships={allMemberships ?? []} currentUserId={user.id} />
+          <MembersPanel users={authUsers} memberships={allMemberships ?? []} organizations={organizationOptions} currentUserId={user.id} />
         )}
+
+        <AdminDashboard
+          initialOrganizations={organizations ?? []}
+          memberOrganizationIds={(memberships ?? []).map((item) => item.organization_id)}
+          isSuperAdmin={Boolean(isAdmin)}
+        />
       </div>
-    </>
+    </div>
   );
 }
