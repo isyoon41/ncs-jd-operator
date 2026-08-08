@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { LogOut, ShieldCheck } from "lucide-react";
+import { Building2, LogOut, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { setActiveOrganization } from "@/app/(app)/actions";
 
@@ -65,6 +65,9 @@ export function AppHeader({
             <span className="text-sm font-semibold text-slate-600">{organizations[0].name}</span>
           ) : null}
           <span className="text-sm text-slate-400">{email}</span>
+          <Link href="/company" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-900">
+            <Building2 className="h-4 w-4" />회사 프로필
+          </Link>
           {isSuperAdmin && (
             <Link href="/admin" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-900">
               <ShieldCheck className="h-4 w-4" />관리

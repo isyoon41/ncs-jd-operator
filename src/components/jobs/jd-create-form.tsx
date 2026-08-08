@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 import {
   ArrowRight,
@@ -51,7 +52,7 @@ export function JdCreateForm({
           <StepTitle number="01" eyebrow="Company context" icon={<Building2 className="h-5 w-5" />} title="Gemini가 회사를 먼저 이해합니다" text="회사 소개를 직접 입력하거나 IR·회사소개 자료를 올려 주세요. 확인 가능한 사실만 회사 프로필로 구조화해 이후 모든 팀과 직무설계에 재사용합니다." />
           <div className="space-y-5">
             <Field label="회사"><select name="organizationId" value={organizationId} onChange={(event) => { setOrganizationId(event.target.value); setShowNewSource(false); }} className={inputClass} required>{organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}</select></Field>
-            {currentProfile && <div className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><div><p className="text-sm font-bold text-emerald-950">회사 프로필 v{currentProfile.version_no}이 준비되어 있습니다</p><p className="mt-1 text-xs leading-5 text-emerald-700">{currentProfile.summary}</p><p className="mt-2 text-xs font-semibold text-emerald-700">별도 입력 없이 이 프로필을 그대로 사용해 바로 진행할 수 있습니다.</p></div></div>}
+            {currentProfile && <div className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><div><p className="text-sm font-bold text-emerald-950">회사 프로필 v{currentProfile.version_no}이 준비되어 있습니다</p><p className="mt-1 text-xs leading-5 text-emerald-700">{currentProfile.summary}</p><p className="mt-2 text-xs font-semibold text-emerald-700">별도 입력 없이 이 프로필을 그대로 사용해 바로 진행할 수 있습니다.</p><Link href="/company" className="mt-2 inline-block text-xs font-bold text-emerald-700 underline">프로필 직접 수정하기</Link></div></div>}
             {currentProfile && !showNewSource ? (
               <button type="button" onClick={() => setShowNewSource(true)} className="text-sm font-bold text-blue-600 hover:text-blue-700">다른 자료로 새 프로필 만들기</button>
             ) : (

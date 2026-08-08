@@ -97,13 +97,16 @@ export async function refineJdDraft(
     return { error: "v1.1 검토가 이미 완료되었습니다. 새 직무를 설계하려면 대시보드의 새 직무설계를 이용해 주세요." };
   }
 
-  const { data: profile } = await supabase
+  const { data: latestProfiles } = await supabase
     .from("organization_profiles")
-    .select("structured_context")
-    .eq("id", latestVersion.organization_profile_id)
-    .maybeSingle();
+    .select("id, structured_context")
+    .eq("organization_id", role.teams.organization_id)
+    .order("version_no", { ascending: false })
+    .limit(1);
+  const profile = latestProfiles?.[0];
   if (!profile) return { error: "직무설계에 사용한 회사 프로필을 찾을 수 없습니다." };
   const company = profile.structured_context as unknown as CompanyContext;
+  const activeProfileId = profile.id;
   const intake = jsonRecord(role.intake);
   const teamCharter = jsonRecord(role.teams.charter);
   const teamRole = typeof intake.teamRole === "string"
@@ -224,7 +227,7 @@ export async function refineJdDraft(
         version_major: latestVersion.version_major,
         version_minor: nextMinor,
         revision_kind: "user_refinement",
-        organization_profile_id: latestVersion.organization_profile_id,
+        organization_profile_id: activeProfileId,
         design_snapshot: design as unknown as Json,
         status: "draft",
         source: design.ncsMappings.length > 0 ? "ncs" : "user_input",
@@ -325,7 +328,7 @@ export async function refineJdDraft(
 
     const updatedCharter: Json = {
       ...teamCharter,
-      companyProfileId: latestVersion.organization_profile_id,
+      companyProfileId: activeProfileId,
       inputRole: teamRole,
       mission: design.teamMission,
       outputs: design.teamOutputs,
