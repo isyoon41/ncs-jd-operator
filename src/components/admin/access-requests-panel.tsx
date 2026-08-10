@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { UserCheck, UserX } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { approveAccessRequestWithNewOrg } from "@/app/(app)/admin/actions";
-import { adminButtonClass, adminCardClass, adminInputClass, adminSectionTitleClass } from "@/components/admin/ui";
+import { adminButtonClass, adminInputClass, adminTableClass } from "@/components/admin/ui";
 
 const NEW_ORG_VALUE = "__new__";
 
@@ -83,57 +83,89 @@ export function AccessRequestsPanel({
 
   return (
     <div>
-      <h2 className={adminSectionTitleClass}>가입 신청 ({initialAccessRequests.length})</h2>
+      <h2 className="text-lg font-bold text-slate-900">
+        가입 신청 대기
+        <span className="ml-2 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-700">
+          {initialAccessRequests.length}
+        </span>
+      </h2>
+      <p className="mt-1 text-xs text-slate-400">
+        확인된 사용자는 회사를 선택해 승인하고, 확인되지 않은 사용자는 거절하세요.
+      </p>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      <div className="mt-3 space-y-3">
-        {initialAccessRequests.map((request) => {
-          const selection = selectedOrgByRequest[request.request_id] ?? "";
-          return (
-            <div key={request.request_id} className={`${adminCardClass} border-amber-200 bg-amber-50`}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">{request.user_email}</p>
-                  <p className="text-xs text-slate-500">신청 회사: {request.requested_organization_name} · {new Date(request.created_at).toLocaleDateString("ko-KR")}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <select
-                    value={selection}
-                    onChange={(e) => setSelectedOrgByRequest((current) => ({ ...current, [request.request_id]: e.target.value }))}
-                    className={adminButtonClass.select}
-                  >
-                    <option value="">연결할 회사 선택</option>
-                    {organizations.map((org) => (
-                      <option key={org.id} value={org.id}>{org.name}</option>
-                    ))}
-                    <option value={NEW_ORG_VALUE}>+ 새 회사 만들기</option>
-                  </select>
-                  {selection === NEW_ORG_VALUE && (
-                    <input
-                      value={newOrgNameByRequest[request.request_id] ?? request.requested_organization_name}
-                      onChange={(e) => setNewOrgNameByRequest((current) => ({ ...current, [request.request_id]: e.target.value }))}
-                      placeholder="새 회사 이름"
-                      className={`${adminInputClass} w-40 py-1.5`}
-                    />
-                  )}
-                  <button
-                    onClick={() => handleApproveRequest(request)}
-                    disabled={reviewingRequestId === request.request_id}
-                    className={`flex items-center gap-1 ${adminButtonClass.primary}`}
-                  >
-                    <UserCheck className="h-3.5 w-3.5" />승인
-                  </button>
-                  <button
-                    onClick={() => handleRejectRequest(request.request_id)}
-                    disabled={reviewingRequestId === request.request_id}
-                    className={`flex items-center gap-1 ${adminButtonClass.danger}`}
-                  >
-                    <UserX className="h-3.5 w-3.5" />거절
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+
+      <div className={`${adminTableClass.wrapper} border-amber-200`}>
+        <table className={adminTableClass.table}>
+          <thead>
+            <tr className="bg-amber-50">
+              <th className={adminTableClass.headCell}>이메일</th>
+              <th className={adminTableClass.headCell}>신청 회사</th>
+              <th className={adminTableClass.headCell}>신청일</th>
+              <th className={adminTableClass.headCell}>연결할 회사</th>
+              <th className={adminTableClass.headCell}>승인 / 거절</th>
+            </tr>
+          </thead>
+          <tbody>
+            {initialAccessRequests.map((request) => {
+              const selection = selectedOrgByRequest[request.request_id] ?? "";
+              const busy = reviewingRequestId === request.request_id;
+              return (
+                <tr key={request.request_id} className={adminTableClass.row}>
+                  <td className={`${adminTableClass.cell} font-semibold text-slate-900`}>{request.user_email}</td>
+                  <td className={adminTableClass.cell}>{request.requested_organization_name}</td>
+                  <td className={`${adminTableClass.cell} text-slate-500`}>
+                    {new Date(request.created_at).toLocaleDateString("ko-KR")}
+                  </td>
+                  <td className={adminTableClass.cell}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        value={selection}
+                        onChange={(e) =>
+                          setSelectedOrgByRequest((current) => ({ ...current, [request.request_id]: e.target.value }))
+                        }
+                        className={adminButtonClass.select}
+                      >
+                        <option value="">연결할 회사 선택</option>
+                        {organizations.map((org) => (
+                          <option key={org.id} value={org.id}>{org.name}</option>
+                        ))}
+                        <option value={NEW_ORG_VALUE}>+ 새 회사 만들기</option>
+                      </select>
+                      {selection === NEW_ORG_VALUE && (
+                        <input
+                          value={newOrgNameByRequest[request.request_id] ?? request.requested_organization_name}
+                          onChange={(e) =>
+                            setNewOrgNameByRequest((current) => ({ ...current, [request.request_id]: e.target.value }))
+                          }
+                          placeholder="새 회사 이름"
+                          className={`${adminInputClass} w-40 py-1.5`}
+                        />
+                      )}
+                    </div>
+                  </td>
+                  <td className={adminTableClass.cell}>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleApproveRequest(request)}
+                        disabled={busy}
+                        className={`flex items-center gap-1 ${adminButtonClass.primary}`}
+                      >
+                        <UserCheck className="h-3.5 w-3.5" />승인
+                      </button>
+                      <button
+                        onClick={() => handleRejectRequest(request.request_id)}
+                        disabled={busy}
+                        className={`flex items-center gap-1 ${adminButtonClass.danger}`}
+                      >
+                        <UserX className="h-3.5 w-3.5" />거절
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );

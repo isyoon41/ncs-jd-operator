@@ -11,4 +11,14 @@ export const adminButtonClass = {
 } as const;
 
 export const adminSectionTitleClass = "text-sm font-bold text-slate-700";
+
+export const adminTableClass = {
+  wrapper: "mt-3 overflow-x-auto rounded-2xl border border-slate-200 bg-white",
+  table: "w-full min-w-[720px] border-collapse text-sm",
+  headCell: "border-b border-slate-200 px-4 py-3 text-left text-xs font-bold text-slate-500",
+  row: "border-b border-slate-100 last:border-0",
+  cell: "px-4 py-3 align-middle text-slate-700",
+  iconButton: "grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40",
+  iconButtonDanger: "grid h-8 w-8 place-items-center rounded-lg border border-red-200 text-red-500 transition-colors hover:bg-red-50 disabled:opacity-40",
+} as const;
 export const adminInputClass = "rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20";

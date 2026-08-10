@@ -22,6 +22,18 @@ export async function setMembershipStatus(memberId: string, status: "active" | "
   return { error: null };
 }
 
+export async function setMembershipRole(
+  memberId: string,
+  role: "owner" | "admin" | "member",
+): Promise<AdminActionState> {
+  const { supabase, isAdmin } = await requirePlatformAdmin();
+  if (!isAdmin) return { error: "관리자 권한이 없습니다." };
+
+  const { error } = await supabase.from("organization_members").update({ role }).eq("id", memberId);
+  if (error) return { error: error.message };
+  return { error: null };
+}
+
 export async function suspendUserAccount(userId: string): Promise<AdminActionState> {
   const { isAdmin } = await requirePlatformAdmin();
   if (!isAdmin) return { error: "관리자 권한이 없습니다." };

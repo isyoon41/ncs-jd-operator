@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { AdminDashboard } from "@/components/admin/admin-dashboard";
-import { MembersPanel } from "@/components/admin/members-panel";
+import { CompanyMembersPanel } from "@/components/admin/company-members-panel";
 import { AccessRequestsPanel } from "@/components/admin/access-requests-panel";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
@@ -20,21 +19,21 @@ export default async function AdminPage() {
 
   const { data: organizations } = await supabase
     .from("organizations")
-    .select(
-      "id, name, slug, created_at, organization_invites(id, token, role, is_revoked, expires_at, created_at)"
-    )
-    .order("created_at", { ascending: false });
+    .select("id, name")
+    .order("name");
   const organizationOptions = (organizations ?? []).map((org) => ({ id: org.id, name: org.name }));
-
-  const { data: memberships } = await supabase
-    .from("organization_members")
-    .select("organization_id")
-    .eq("user_id", user.id);
 
   const { data: pendingRequests } = await supabase.rpc("list_pending_access_requests");
   const { data: allMemberships } = await supabase.rpc("list_all_organization_members");
 
-  let authUsers: { id: string; email: string; created_at: string; email_confirmed_at: string | null; banned_until: string | null }[] = [];
+  let authUsers: {
+    id: string;
+    email: string;
+    display_name: string | null;
+    created_at: string;
+    email_confirmed_at: string | null;
+    banned_until: string | null;
+  }[] = [];
   let membersError: string | null = null;
   try {
     const admin = createAdminClient();
@@ -42,13 +41,17 @@ export default async function AdminPage() {
     if (error) throw error;
     authUsers = data.users
       .filter((authUser): authUser is typeof authUser & { email: string } => Boolean(authUser.email))
-      .map((authUser) => ({
-        id: authUser.id,
-        email: authUser.email,
-        created_at: authUser.created_at,
-        email_confirmed_at: authUser.email_confirmed_at ?? null,
-        banned_until: authUser.banned_until ?? null,
-      }));
+      .map((authUser) => {
+        const displayName = authUser.user_metadata?.display_name;
+        return {
+          id: authUser.id,
+          email: authUser.email,
+          display_name: typeof displayName === "string" && displayName.trim() ? displayName : null,
+          created_at: authUser.created_at,
+          email_confirmed_at: authUser.email_confirmed_at ?? null,
+          banned_until: authUser.banned_until ?? null,
+        };
+      });
   } catch (error) {
     membersError = error instanceof Error ? error.message : "회원 목록을 불러오지 못했습니다.";
   }
@@ -58,24 +61,25 @@ export default async function AdminPage() {
       <PageHeader
         backHref="/"
         eyebrow="Platform admin"
-        title="마스터 관리자"
-        description="가입 신청 승인, 회원 관리, 회사·초대 운영을 한 곳에서 처리하세요."
+        title="사용자 설정"
+        description="회사를 만들고, 가입 신청을 승인·거절하고, 회사별 사용자와 역할을 관리합니다."
       />
 
       <div className="space-y-10">
         <AccessRequestsPanel initialAccessRequests={pendingRequests ?? []} organizations={organizationOptions} />
 
         {membersError ? (
-          <p className="text-sm text-red-600">회원 목록을 불러오지 못했습니다: {membersError} (SUPABASE_SERVICE_ROLE_KEY 환경변수를 확인해 주세요)</p>
+          <p className="text-sm text-red-600">
+            회원 목록을 불러오지 못했습니다: {membersError} (SUPABASE_SERVICE_ROLE_KEY 환경변수를 확인해 주세요)
+          </p>
         ) : (
-          <MembersPanel users={authUsers} memberships={allMemberships ?? []} organizations={organizationOptions} currentUserId={user.id} />
+          <CompanyMembersPanel
+            users={authUsers}
+            memberships={allMemberships ?? []}
+            organizations={organizationOptions}
+            currentUserId={user.id}
+          />
         )}
-
-        <AdminDashboard
-          initialOrganizations={organizations ?? []}
-          memberOrganizationIds={(memberships ?? []).map((item) => item.organization_id)}
-          isSuperAdmin={Boolean(isAdmin)}
-        />
       </div>
     </PageContainer>
   );
