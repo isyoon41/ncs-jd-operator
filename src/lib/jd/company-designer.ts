@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
+import { computeCoverageScore } from "./coverage-score";
 
 export const GEMINI_MODEL = "gemini-3.6-flash";
 
@@ -515,11 +516,14 @@ ${JSON.stringify(input.design)}
 - teamMission과 primaryRole.mission이 회사 mission뿐 아니라 vision의 방향성과 coreValues 중 최소 1개를 반영하는지. mission만 희미하게 echo하고 vision·coreValues가 전혀 안 보이면 design에서 직접 보완할 것. reasoningNotes.contextUnderstanding도 실제 mission·vision·coreValues 내용을 구체적으로 인용하도록 고칠 것
 - 미션·책임 문장이 "~한다"체이고 근거 없는 수식어("혁신적인", "최고의" 등)가 없는지, 자격요건이 명사구로 통일되어 있는지 — 어긋나는 문장은 design에서 직접 고칠 것
 
-coverageScore는 NCS 비율이 아니라 전체 핵심 문장이 회사·팀·NCS 중 적절한 출처로 설명되는 정도입니다.
+근거 충실도 점수는 시스템이 design과 findings에서 직접 계산하므로 당신이 점수를 매길 필요는 없습니다. 대신 그 계산의 입력이 되는 두 가지를 정확하게 채우세요.
+
+[정확도가 중요한 두 필드]
+- 각 항목의 basis: 회사 자료로 뒷받침되면 "company", 팀 입력에 있으면 "team_input", NCS 능력단위에서 나왔으면 "ncs", 어디에서도 확인되지 않고 당신이 만들어낸 문장이면 반드시 "ai_inference"로 표시합니다. 근거가 없는데 company나 ncs로 표시하지 마세요.
+- 각 finding의 severity: 문장 다듬기 수준의 제안은 "info", 근거가 약하거나 회사 맥락과 어긋나는 내용은 "warning", 발명된 자격요건·연차·수치처럼 사용자에게 잘못된 정보를 주는 문제는 "critical"로 표시합니다. 전부 info로 표시하지 마세요.
 
 응답 객체의 payload에는 다음 키를 가진 JSON 객체를 문자열로 직렬화해 넣으세요. 마크다운 코드블록은 사용하지 않습니다.
 - status: passed | passed_with_notes | needs_review
-- coverageScore: 0~100 정수
 - summary: 검토 요약
 - findings: [{severity: info|warning|critical, category: string, message: string}]
 - design: 검토와 수정을 반영한 완전한 직무설계 객체. 입력된 [검토 대상]과 동일한 키 구조를 모두 유지합니다. reasoningNotes를 수정할 때도 "필터링", "매칭" 같은 개발 용어 대신 인사·조직설계 용어로 씁니다.`;
@@ -541,11 +545,12 @@ coverageScore는 NCS 비율이 아니라 전체 핵심 문장이 회사·팀·NC
     return [{ severity, category: textValue(record.category, "일반"), message }];
   }).slice(0, 12) : [];
   const rawDesign = raw.design && typeof raw.design === "object" ? raw.design as Record<string, unknown> : input.design as unknown as Record<string, unknown>;
+  const design = normalizeDesign(rawDesign, input);
   return {
     status,
-    coverageScore: typeof raw.coverageScore === "number" ? Math.max(0, Math.min(100, Math.round(raw.coverageScore))) : 0,
+    coverageScore: computeCoverageScore(design, findings),
     summary: textValue(raw.summary, "NCS 및 회사 맥락 검토가 완료되었습니다."),
     findings,
-    design: normalizeDesign(rawDesign, input),
+    design,
   };
 }
