@@ -3,6 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { stringArray, textValue } from "./company-context";
 import { computeCoverageScore } from "./coverage-score";
+import { rankNcsCandidates } from "./ncs-retrieval";
+import { escapeLikePattern } from "./text-utils";
 
 export const GEMINI_MODEL = "gemini-3.6-flash";
 
@@ -256,14 +258,18 @@ export async function retrieveNcsCandidates(
   supabase: SupabaseClient<Database>,
   plan: NcsSearchPlan,
 ): Promise<NcsCandidate[]> {
+  const searchTerms = [...new Set(plan.searchTerms.map((term) => term.trim()).filter(Boolean))];
   const responses = await Promise.all(
-    plan.searchTerms.map((term) =>
-      supabase
-        .from("ncs_competency_units")
-        .select("id, ncs_code, name, level, definition, lclas_name, mclas_name, sclas_name, subd_name")
-        .ilike("name", `%${term}%`)
-        .limit(20),
-    ),
+    searchTerms.flatMap((term) => {
+      const pattern = `%${escapeLikePattern(term)}%`;
+      return (["name", "definition"] as const).map((column) =>
+        supabase
+          .from("ncs_competency_units")
+          .select("id, ncs_code, name, level, definition, lclas_name, mclas_name, sclas_name, subd_name")
+          .ilike(column, pattern)
+          .limit(20),
+      );
+    }),
   );
   const unique = new Map<string, NcsCandidate>();
   responses.forEach(({ data }) => data?.forEach((unit) => unique.set(unit.id, {
@@ -278,10 +284,7 @@ export async function retrieveNcsCandidates(
     subdName: unit.subd_name,
   })));
   const candidates = [...unique.values()];
-  const scoped = plan.majorCodes.length > 0
-    ? candidates.filter((unit) => plan.majorCodes.some((code) => unit.ncsCode.startsWith(code)))
-    : candidates;
-  return (scoped.length >= 5 ? scoped : candidates).slice(0, 50);
+  return rankNcsCandidates(candidates, plan, 50);
 }
 
 const encodedPayloadSchema = {
