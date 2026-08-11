@@ -1,10 +1,10 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useOptimistic, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Building2, LogOut, ShieldCheck } from "lucide-react";
+import { Building2, LoaderCircle, LogOut, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { setActiveOrganization } from "@/app/(app)/actions";
 
@@ -22,12 +22,24 @@ export function AppHeader({
   isSuperAdmin: boolean;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
+  // 서버 왕복이 끝나기 전에도 고른 회사가 바로 보이도록 한다.
+  // (제어 컴포넌트라 이게 없으면 선택이 이전 값으로 되돌아갔다 늦게 바뀐다)
+  const [optimisticOrgId, setOptimisticOrgId] = useOptimistic(activeOrgId);
 
   const handleOrgChange = (value: string) => {
+    const nextOrgId = value === "" ? null : value;
     startTransition(async () => {
-      await setActiveOrganization(value === "" ? null : value);
-      router.refresh();
+      setOptimisticOrgId(nextOrgId);
+      await setActiveOrganization(nextOrgId);
+      // 관리자 화면은 전체 회사를 보여주므로 회사를 바꿔도 화면이 달라지지 않는다.
+      // 선택이 결과로 이어지도록 해당 회사의 대시보드로 이동한다.
+      if (pathname.startsWith("/admin")) {
+        router.push("/");
+      } else {
+        router.refresh();
+      }
     });
   };
 
@@ -54,19 +66,21 @@ export function AppHeader({
         </Link>
         <div className="flex flex-wrap items-center gap-4">
           {organizations.length > 1 ? (
-            <select
-              value={activeOrgId ?? ""}
-              onChange={(event) => handleOrgChange(event.target.value)}
-              disabled={isPending}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400"
-            >
-              <option value="">전체 회사 보기</option>
-              {organizations.map((organization) => (
-                <option key={organization.id} value={organization.id}>
-                  {organization.name}
-                </option>
-              ))}
-            </select>
+            <span className="flex items-center gap-2">
+              {isPending && <LoaderCircle className="h-4 w-4 animate-spin text-slate-400" />}
+              <select
+                value={optimisticOrgId ?? ""}
+                onChange={(event) => handleOrgChange(event.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400"
+              >
+                <option value="">전체 회사 보기</option>
+                {organizations.map((organization) => (
+                  <option key={organization.id} value={organization.id}>
+                    {organization.name}
+                  </option>
+                ))}
+              </select>
+            </span>
           ) : organizations[0] ? (
             <span className="text-sm font-semibold text-slate-600">{organizations[0].name}</span>
           ) : null}

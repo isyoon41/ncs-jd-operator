@@ -1,24 +1,21 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { ArrowRight, Building2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getAccessibleOrganizations, resolveActiveOrgId } from "@/lib/org/active-organization";
+import { getOrgContext } from "@/lib/auth/session";
 import { CompanyProfileForm } from "@/components/company/company-profile-form";
 import type { CompanyContext } from "@/lib/jd/company-designer";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
 
 export default async function CompanyProfilePage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/company");
-
-  const { organizations } = await getAccessibleOrganizations(supabase, user.id);
+  const context = await getOrgContext();
+  if (!context) redirect("/login?next=/company");
+  const { organizations, activeOrgId } = context;
   if (organizations.length === 0) redirect("/");
-  const cookieStore = await cookies();
-  const activeOrgId = resolveActiveOrgId(cookieStore.get("active_org_id")?.value, organizations);
   const organization = organizations.find((item) => item.id === activeOrgId) ?? organizations[0];
+
+  const supabase = await createClient();
 
   const { data: latestProfiles } = await supabase
     .from("organization_profiles")

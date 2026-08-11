@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import {
   ArrowRight,
   Building2,
@@ -13,23 +12,19 @@ import {
   Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getAccessibleOrganizations, resolveActiveOrgId } from "@/lib/org/active-organization";
+import { getOrgContext } from "@/lib/auth/session";
 import { AccessRequestForm } from "@/components/onboarding/access-request-form";
 import { PageContainer } from "@/components/layout/page-container";
 import { RoleCard } from "@/components/dashboard/role-card";
 
 export default async function Home() {
+  const context = await getOrgContext();
+  if (!context) redirect("/login");
+  const { user, organizations: allOrganizations, activeOrgId } = context;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
-  const { organizations: allOrganizations } = await getAccessibleOrganizations(supabase, user.id);
   const organizations = allOrganizations.filter((organization) => organization.status === "active");
   const heldOrganizations = allOrganizations.filter((organization) => organization.status === "held");
-  const cookieStore = await cookies();
-  const activeOrgId = resolveActiveOrgId(cookieStore.get("active_org_id")?.value, organizations);
   const organizationIds = activeOrgId ? [activeOrgId] : organizations.map((organization) => organization.id);
 
   const { data: teams } = organizationIds.length

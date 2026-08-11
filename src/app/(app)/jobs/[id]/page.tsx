@@ -19,6 +19,7 @@ import {
   Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/auth/session";
 import type { Json } from "@/lib/supabase/database.types";
 import { JdPdfDownloadButton } from "@/components/jobs/jd-pdf-download-button";
 import type { JdPdfData } from "@/lib/pdf/jd-document";
@@ -60,10 +61,10 @@ function textField(value: Json | undefined) {
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) redirect(`/login?next=/jobs/${id}`);
 
+  const supabase = await createClient();
   const { data: role } = await supabase
     .from("team_roles")
     .select("id, title, seniority_hint, status, intake, teams(id, name, mission, charter, organizations(id, name)), jd_versions(id, version_no, version_major, version_minor, revision_kind, design_snapshot, status, source, organization_profile_id, created_at, jd_sections(id, kind, position, content, metadata, jd_evidence(id, source, snippet, confidence, ncs_competency_units(ncs_code, name, level))))")

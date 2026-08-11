@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { getAccessibleOrganizations, resolveActiveOrgId } from "@/lib/org/active-organization";
+import { getOrgContext } from "@/lib/auth/session";
 import { JdCreateForm } from "@/components/jobs/jd-create-form";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
@@ -9,15 +8,12 @@ import { PageHeader } from "@/components/layout/page-header";
 export const maxDuration = 300;
 
 export default async function NewJobPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/jobs/new");
-
-  const { organizations } = await getAccessibleOrganizations(supabase, user.id);
+  const context = await getOrgContext();
+  if (!context) redirect("/login?next=/jobs/new");
+  const { organizations, activeOrgId } = context;
   if (organizations.length === 0) redirect("/");
-  const cookieStore = await cookies();
-  const activeOrgId = resolveActiveOrgId(cookieStore.get("active_org_id")?.value, organizations);
 
+  const supabase = await createClient();
   const { data: profileRows } = await supabase
     .from("organization_profiles")
     .select("organization_id, version_no, summary")

@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/auth/session";
 import type { Json } from "@/lib/supabase/database.types";
 import { JdRefineForm } from "@/components/jobs/jd-refine-form";
 import { PageContainer } from "@/components/layout/page-container";
@@ -25,10 +26,10 @@ function roleTitles(value: Json | undefined): string[] {
 
 export default async function EditJobPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) redirect(`/login?next=/jobs/${id}/edit`);
 
+  const supabase = await createClient();
   const { data: role } = await supabase
     .from("team_roles")
     .select("id, title, intake, teams(name, mission, charter, organization_id, organizations(name)), jd_versions(version_no, version_major, version_minor, design_snapshot, organization_profile_id, organization_profiles(version_no), jd_sections(kind, position, content, metadata))")
