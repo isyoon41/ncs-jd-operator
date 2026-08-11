@@ -73,6 +73,18 @@ export async function changeUserOrganization(
   const { supabase, isAdmin } = await requirePlatformAdmin();
   if (!isAdmin) return { error: "관리자 권한이 없습니다." };
 
+  // 플랫폼 운영자는 소속과 무관하게 모든 회사에 접근한다. 소속을 붙이면 권한은 그대로인 채
+  // 관리 화면에서만 특정 회사 사용자처럼 보이게 되므로 아예 막는다.
+  if (targetOrgId) {
+    const admin = createAdminClient();
+    const { data: platformAdmin } = await admin
+      .from("platform_admins")
+      .select("user_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (platformAdmin) return { error: "플랫폼 운영자 계정은 소속 회사를 가질 수 없습니다." };
+  }
+
   const { error: deleteError } = await supabase.from("organization_members").delete().eq("user_id", userId);
   if (deleteError) return { error: deleteError.message };
 

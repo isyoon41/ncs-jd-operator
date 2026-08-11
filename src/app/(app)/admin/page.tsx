@@ -50,6 +50,19 @@ async function listAuthUsers(): Promise<{ users: AdminAuthUser[]; error: string 
   }
 }
 
+// platform_admins는 RLS 정책이 없어 service_role로만 읽힌다.
+// 실패해도 화면 전체를 막지 않고 빈 목록으로 떨어뜨린다 — 배지가 안 보일 뿐이다.
+async function listPlatformAdminIds(): Promise<string[]> {
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin.from("platform_admins").select("user_id");
+    if (error) throw error;
+    return (data ?? []).map((row) => row.user_id);
+  } catch {
+    return [];
+  }
+}
+
 export default async function AdminPage() {
   // 레이아웃이 이미 조회한 값을 재사용한다 (React cache로 요청당 1회).
   const context = await getOrgContext();
@@ -62,11 +75,12 @@ export default async function AdminPage() {
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
 
   const supabase = await createClient();
-  const [{ data: pendingRequests }, { data: allMemberships }, { users: authUsers, error: membersError }] =
+  const [{ data: pendingRequests }, { data: allMemberships }, { users: authUsers, error: membersError }, platformAdminIds] =
     await Promise.all([
       supabase.rpc("list_pending_access_requests"),
       supabase.rpc("list_all_organization_members"),
       listAuthUsers(),
+      listPlatformAdminIds(),
     ]);
 
   return (
@@ -91,6 +105,7 @@ export default async function AdminPage() {
             memberships={allMemberships ?? []}
             organizations={organizationOptions}
             currentUserId={user.id}
+            platformAdminIds={platformAdminIds}
           />
         )}
       </div>

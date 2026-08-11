@@ -70,11 +70,13 @@ export function CompanyMembersPanel({
   memberships,
   organizations,
   currentUserId,
+  platformAdminIds,
 }: {
   users: AuthUser[];
   memberships: Membership[];
   organizations: Organization[];
   currentUserId: string;
+  platformAdminIds: string[];
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -93,20 +95,26 @@ export function CompanyMembersPanel({
     return map;
   }, [memberships]);
 
+  // 슈퍼관리자는 소속 없이도 모든 회사에 접근한다. 회사 표나 "소속 회사 없음"에 섞이면
+  // 연결이 필요한 계정처럼 보이므로 따로 뗀다.
+  const adminIdSet = useMemo(() => new Set(platformAdminIds), [platformAdminIds]);
+  const superAdmins = useMemo(() => users.filter((user) => adminIdSet.has(user.id)), [users, adminIdSet]);
+  const regularUsers = useMemo(() => users.filter((user) => !adminIdSet.has(user.id)), [users, adminIdSet]);
+
   const usersByOrg = useMemo(() => {
     const map = new Map<string, AuthUser[]>();
     organizations.forEach((organization) => map.set(organization.id, []));
-    users.forEach((user) => {
+    regularUsers.forEach((user) => {
       const membership = membershipByUser.get(user.id);
       if (!membership) return;
       map.get(membership.organization_id)?.push(user);
     });
     return map;
-  }, [users, organizations, membershipByUser]);
+  }, [regularUsers, organizations, membershipByUser]);
 
   const unassignedUsers = useMemo(
-    () => users.filter((user) => !membershipByUser.has(user.id)),
-    [users, membershipByUser],
+    () => regularUsers.filter((user) => !membershipByUser.has(user.id)),
+    [regularUsers, membershipByUser],
   );
 
   async function run(userId: string, task: () => Promise<{ error: string | null }>) {
@@ -206,7 +214,12 @@ export function CompanyMembersPanel({
           </td>
           <td className={adminTableClass.cell}>{user.email}</td>
           <td className={adminTableClass.cell}>
-            {membership ? (
+            {adminIdSet.has(user.id) ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                슈퍼관리자
+              </span>
+            ) : membership ? (
               <select
                 value={membership.role}
                 onChange={(event) =>
@@ -371,6 +384,35 @@ export function CompanyMembersPanel({
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
       <div className="mt-5 space-y-8">
+        {superAdmins.length > 0 && (
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <span className="grid h-7 w-7 place-items-center rounded-lg bg-blue-50 text-blue-600">
+                <ShieldCheck className="h-4 w-4" />
+              </span>
+              플랫폼 운영자
+              <span className="text-xs font-medium text-slate-400">{superAdmins.length}명</span>
+            </h3>
+            <p className="mt-1 text-xs text-slate-400">
+              모든 회사에 접근할 수 있어 소속 회사를 두지 않습니다. 회사 연결이 필요한 계정이 아닙니다.
+            </p>
+            <div className={adminTableClass.wrapper}>
+              <table className={adminTableClass.table}>
+                <thead>
+                  <tr>
+                    <th className={adminTableClass.headCell}>이름</th>
+                    <th className={adminTableClass.headCell}>이메일</th>
+                    <th className={adminTableClass.headCell}>권한</th>
+                    <th className={adminTableClass.headCell}>가입일</th>
+                    <th className={adminTableClass.headCell}>관리</th>
+                  </tr>
+                </thead>
+                <tbody>{renderRows(superAdmins, "")}</tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {organizations.length === 0 && (
           <p className="text-sm text-slate-400">아직 등록된 회사가 없습니다. 먼저 회사를 만들어 주세요.</p>
         )}
