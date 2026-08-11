@@ -4,7 +4,7 @@ import { ArrowRight, Building2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getOrgContext } from "@/lib/auth/session";
 import { CompanyProfileForm } from "@/components/company/company-profile-form";
-import type { CompanyContext } from "@/lib/jd/company-designer";
+import { normalizeCompanyContext } from "@/lib/jd/company-context";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
 
@@ -40,7 +40,7 @@ export default async function CompanyProfilePage() {
       />
 
       {latestProfile ? (
-        <CompanyProfileForm organizationId={organization.id} profile={latestProfile.structured_context as unknown as CompanyContext} />
+        <CompanyProfileForm organizationId={organization.id} profile={normalizeCompanyContext(latestProfile.structured_context)} />
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
           <Building2 className="mx-auto h-8 w-8 text-slate-300" />

@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
+import { stringArray, textValue } from "./company-context";
 import { computeCoverageScore } from "./coverage-score";
 
 export const GEMINI_MODEL = "gemini-3.6-flash";
@@ -101,14 +102,6 @@ export type ValidationResult = {
 type GeminiPart =
   | { text: string }
   | { inlineData: { mimeType: string; data: string } };
-
-const stringArray = (value: unknown, max = 12) =>
-  Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim()).slice(0, max)
-    : [];
-
-const textValue = (value: unknown, fallback = "") =>
-  typeof value === "string" && value.trim() ? value.trim() : fallback;
 
 async function generateStructured<T>(parts: GeminiPart[], schema: object, operation: string): Promise<T> {
   const apiKey = process.env.GEMINI_API_KEY;
