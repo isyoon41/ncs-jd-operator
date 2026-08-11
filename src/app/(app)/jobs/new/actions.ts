@@ -51,16 +51,9 @@ export async function createJdDraft(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/jobs/new");
 
-  const { data: isSuperAdmin } = await supabase.rpc("is_platform_admin");
-  if (!isSuperAdmin) {
-    const { data: membership } = await supabase
-      .from("organization_members")
-      .select("organization_id")
-      .eq("organization_id", organizationId)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (!membership) return { error: "선택한 회사에 대한 접근 권한이 없습니다." };
-  }
+  // is_org_admin은 플랫폼 운영자도 포함하므로 별도 우회 분기가 필요 없다.
+  const { data: canManage } = await supabase.rpc("is_org_admin", { target_org_id: organizationId });
+  if (!canManage) return { error: "직무설계 생성은 관리자만 할 수 있습니다." };
 
   const { data: organization } = await supabase
     .from("organizations")

@@ -26,6 +26,8 @@ export default async function Home() {
   const organizations = allOrganizations.filter((organization) => organization.status === "active");
   const heldOrganizations = allOrganizations.filter((organization) => organization.status === "held");
   const organizationIds = activeOrgId ? [activeOrgId] : organizations.map((organization) => organization.id);
+  const canManageOrg = new Map(organizations.map((organization) => [organization.id, organization.memberRole !== "member"]));
+  const canManageAnyOrg = [...canManageOrg.values()].some(Boolean);
 
   const { data: teams } = organizationIds.length
     ? await supabase
@@ -115,7 +117,9 @@ export default async function Home() {
                 <h1 className="mt-3 max-w-3xl text-3xl font-bold tracking-tight sm:text-4xl">회사를 이해한 AI가 NCS 근거로 직무를 설계합니다.</h1>
                 <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">회사 소개자료와 간단한 팀 역할만 입력하면 Gemini가 팀 구조와 직무기술서 v1.0을 만들고 NCS 근거 루프로 다시 검토합니다.</p>
               </div>
-              <Link href="/jobs/new" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500"><Plus className="h-4 w-4" />v1.0 직무설계 시작</Link>
+              {canManageAnyOrg && (
+                <Link href="/jobs/new" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500"><Plus className="h-4 w-4" />v1.0 직무설계 시작</Link>
+              )}
             </section>
 
             <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -136,7 +140,9 @@ export default async function Home() {
                   <FileText className="mx-auto h-8 w-8 text-slate-300" />
                   <h3 className="mt-4 font-bold text-slate-800">회사 이해에서 첫 직무설계를 시작하세요</h3>
                   <p className="mt-2 text-sm text-slate-400">회사 자료와 팀 역할을 바탕으로 NCS 검토가 완료된 v1.0을 만듭니다.</p>
-                  <Link href="/jobs/new" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-blue-600">v1.0 만들기<ArrowRight className="h-4 w-4" /></Link>
+                  {canManageAnyOrg && (
+                    <Link href="/jobs/new" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-blue-600">v1.0 만들기<ArrowRight className="h-4 w-4" /></Link>
+                  )}
                 </div>
               ) : draftRoles.length === 0 ? (
                 <p className="mt-5 text-sm text-slate-400">현재 작성 중인 직무기술서가 없습니다. 확정된 직무기술서는 아래 팀별 보관함에서 볼 수 있습니다.</p>
@@ -147,6 +153,7 @@ export default async function Home() {
                       key={role.id}
                       role={{ ...role, organizationName: role.organization?.name }}
                       showConfirm
+                      canManage={Boolean(role.organization && canManageOrg.get(role.organization.id))}
                     />
                   ))}
                 </div>
@@ -173,6 +180,7 @@ export default async function Home() {
                             key={role.id}
                             role={{ ...role, organizationName: role.organization?.name }}
                             showConfirm={false}
+                            canManage={Boolean(role.organization && canManageOrg.get(role.organization.id))}
                           />
                         ))}
                       </div>

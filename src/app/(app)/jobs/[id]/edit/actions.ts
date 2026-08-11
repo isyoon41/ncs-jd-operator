@@ -79,8 +79,8 @@ export async function refineJdDraft(
     .maybeSingle();
   if (!role?.teams?.organizations) return { error: "수정할 직무 또는 회사 정보를 찾을 수 없습니다." };
 
-  const { data: canAccess } = await supabase.rpc("is_org_member", { target_org_id: role.teams.organization_id });
-  if (!canAccess) return { error: "이 직무를 수정할 권한이 없습니다." };
+  const { data: canManage } = await supabase.rpc("is_org_admin", { target_org_id: role.teams.organization_id });
+  if (!canManage) return { error: "직무설계 보완은 관리자만 할 수 있습니다." };
 
   const rateLimit = await checkAiGenerationRateLimit(supabase, role.teams.organization_id, user.id);
   if (!rateLimit.allowed) return { error: rateLimit.message };

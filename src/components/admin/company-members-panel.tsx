@@ -50,8 +50,11 @@ interface Organization {
   name: string;
 }
 
+// "소유자"는 실제로 admin과 동일하게 취급되고(is_org_admin) 지금 아무도 갖고 있지 않아
+// 드롭다운에서는 뺀다. DB에 남아있을 가능성까지 고려해 표시용 라벨은 admin으로 합친다.
+const selectableRoles: Array<Exclude<Membership["role"], "owner">> = ["admin", "member"];
 const roleLabel: Record<Membership["role"], string> = {
-  owner: "소유자",
+  owner: "관리자",
   admin: "관리자",
   member: "일반",
 };
@@ -221,7 +224,7 @@ export function CompanyMembersPanel({
               </span>
             ) : membership ? (
               <select
-                value={membership.role}
+                value={membership.role === "owner" ? "admin" : membership.role}
                 onChange={(event) =>
                   run(user.id, () =>
                     setMembershipRole(membership.member_id, event.target.value as Membership["role"]),
@@ -230,7 +233,7 @@ export function CompanyMembersPanel({
                 disabled={busy}
                 className={adminButtonClass.select}
               >
-                {(Object.keys(roleLabel) as Membership["role"][]).map((role) => (
+                {selectableRoles.map((role) => (
                   <option key={role} value={role}>
                     {roleLabel[role]}
                   </option>

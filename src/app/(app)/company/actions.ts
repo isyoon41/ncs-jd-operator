@@ -26,8 +26,8 @@ export async function updateCompanyProfile(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/company");
 
-  const { data: canAccess } = await supabase.rpc("is_org_member", { target_org_id: organizationId });
-  if (!canAccess) return { error: "이 회사의 프로필을 수정할 권한이 없습니다." };
+  const { data: canManage } = await supabase.rpc("is_org_admin", { target_org_id: organizationId });
+  if (!canManage) return { error: "회사 프로필 수정은 관리자만 할 수 있습니다." };
 
   const summary = value(formData, "summary", 2000);
   const mission = value(formData, "mission", 1000);

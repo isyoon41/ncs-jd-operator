@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getSessionUser } from "@/lib/auth/session";
+import { getOrgContext } from "@/lib/auth/session";
 import type { Json } from "@/lib/supabase/database.types";
 import { JdRefineForm } from "@/components/jobs/jd-refine-form";
 import { PageContainer } from "@/components/layout/page-container";
@@ -26,8 +26,8 @@ function roleTitles(value: Json | undefined): string[] {
 
 export default async function EditJobPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const user = await getSessionUser();
-  if (!user) redirect(`/login?next=/jobs/${id}/edit`);
+  const context = await getOrgContext();
+  if (!context) redirect(`/login?next=/jobs/${id}/edit`);
 
   const supabase = await createClient();
   const { data: role } = await supabase
@@ -40,6 +40,9 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
   if (!role || !role.jd_versions[0]) notFound();
   const version = role.jd_versions[0];
   if (version.version_major === 1 && version.version_minor >= 1) redirect(`/jobs/${id}`);
+
+  const organization = context.organizations.find((item) => item.id === role.teams?.organization_id);
+  const canManage = organization ? organization.memberRole !== "member" : false;
 
   const { data: latestOrgProfiles } = role.teams?.organization_id
     ? await supabase
@@ -77,21 +80,28 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
         }
       />
       {hasNewerProfile && <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm leading-6 text-blue-800">회사 프로필이 v{usedProfileVersion} → v{latestOrgProfileVersion}로 업데이트되었습니다. 이번 v1.1 보완에는 최신 프로필이 반영됩니다.</div>}
-      <JdRefineForm roleId={id} content={{
-        teamMission: typeof snapshot.teamMission === "string" ? snapshot.teamMission : role.teams?.mission ?? "",
-        teamOutputs: strings(snapshot.teamOutputs ?? teamCharter.outputs),
-        teamResponsibilities: strings(snapshot.teamResponsibilities ?? teamCharter.responsibilities),
-        suggestedRoles: roleTitles(snapshot.suggestedRoles ?? teamCharter.suggestedRoles),
-        roleTitle: typeof primaryRole.title === "string" ? primaryRole.title : role.title,
-        mission: byKind("mission")[0] ?? "",
-        outputs: strings(primaryRole.outputs ?? intake.outputs),
-        responsibilities: byKind("responsibility"),
-        requiredQualifications: byKind("qualification_required"),
-        preferredQualifications: byKind("qualification_preferred"),
-        tools: strings(primaryRole.tools ?? intake.tools),
-        stakeholders: strings(primaryRole.stakeholders ?? intake.stakeholders),
-        kpis: byKind("kpi"),
-      }} />
+      {canManage ? (
+        <JdRefineForm roleId={id} content={{
+          teamMission: typeof snapshot.teamMission === "string" ? snapshot.teamMission : role.teams?.mission ?? "",
+          teamOutputs: strings(snapshot.teamOutputs ?? teamCharter.outputs),
+          teamResponsibilities: strings(snapshot.teamResponsibilities ?? teamCharter.responsibilities),
+          suggestedRoles: roleTitles(snapshot.suggestedRoles ?? teamCharter.suggestedRoles),
+          roleTitle: typeof primaryRole.title === "string" ? primaryRole.title : role.title,
+          mission: byKind("mission")[0] ?? "",
+          outputs: strings(primaryRole.outputs ?? intake.outputs),
+          responsibilities: byKind("responsibility"),
+          requiredQualifications: byKind("qualification_required"),
+          preferredQualifications: byKind("qualification_preferred"),
+          tools: strings(primaryRole.tools ?? intake.tools),
+          stakeholders: strings(primaryRole.stakeholders ?? intake.stakeholders),
+          kpis: byKind("kpi"),
+        }} />
+      ) : (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
+          <h3 className="font-bold text-slate-800">직무설계 보완 권한이 없습니다</h3>
+          <p className="mt-2 text-sm text-slate-400">v1.1 보완은 관리자만 할 수 있습니다.</p>
+        </div>
+      )}
     </PageContainer>
   );
 }

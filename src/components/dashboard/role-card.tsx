@@ -16,9 +16,11 @@ const statusLabel: Record<string, string> = {
 export function RoleCard({
   role,
   showConfirm,
+  canManage,
 }: {
   role: { id: string; title: string; status: string; seniority_hint: string | null; teamName: string; organizationName?: string };
   showConfirm: boolean;
+  canManage: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -59,30 +61,32 @@ export function RoleCard({
         </p>
         {role.seniority_hint && <p className="mt-4 text-xs font-medium text-slate-500">{role.seniority_hint}</p>}
       </Link>
-      <div className="mt-4 flex gap-2 border-t border-slate-100 pt-4">
-        {showConfirm && (
+      {canManage && (
+        <div className="mt-4 flex gap-2 border-t border-slate-100 pt-4">
+          {showConfirm && (
+            <button
+              type="button"
+              onClick={handleConfirm}
+              disabled={isPending}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-500 disabled:opacity-60"
+            >
+              {isPending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+              확정
+            </button>
+          )}
           <button
             type="button"
-            onClick={handleConfirm}
+            onClick={handleDelete}
             disabled={isPending}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-500 disabled:opacity-60"
+            className={`inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-60 ${
+              showConfirm ? "" : "flex-1"
+            }`}
           >
-            {isPending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-            확정
+            <Trash2 className="h-3.5 w-3.5" />
+            삭제
           </button>
-        )}
-        <button
-          type="button"
-          onClick={handleDelete}
-          disabled={isPending}
-          className={`inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-60 ${
-            showConfirm ? "" : "flex-1"
-          }`}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          삭제
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
