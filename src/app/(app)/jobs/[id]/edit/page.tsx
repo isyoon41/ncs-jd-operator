@@ -3,6 +3,7 @@ import { Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getOrgContext } from "@/lib/auth/session";
 import type { Json } from "@/lib/supabase/database.types";
+import { groundedItemsFromSnapshot } from "@/lib/jd/refinement";
 import { JdRefineForm } from "@/components/jobs/jd-refine-form";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
@@ -61,6 +62,9 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
   const byKind = (kind: typeof sections[number]["kind"]) => sections.filter((section) => section.kind === kind).map((section) => section.content);
   const snapshot = record(version.design_snapshot);
   const primaryRole = record(snapshot.primaryRole ?? {});
+  const inferredContents = (value: Json | undefined) => groundedItemsFromSnapshot(value)
+    .filter((item) => item.basis === "ai_inference")
+    .map((item) => item.content);
   const intake = record(role.intake);
   const teamCharter = record(role.teams?.charter ?? {});
 
@@ -90,8 +94,11 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
           mission: byKind("mission")[0] ?? "",
           outputs: strings(primaryRole.outputs ?? intake.outputs),
           responsibilities: byKind("responsibility"),
+          inferredResponsibilities: inferredContents(primaryRole.responsibilities),
           requiredQualifications: byKind("qualification_required"),
+          inferredRequiredQualifications: inferredContents(primaryRole.requiredQualifications),
           preferredQualifications: byKind("qualification_preferred"),
+          inferredPreferredQualifications: inferredContents(primaryRole.preferredQualifications),
           tools: strings(primaryRole.tools ?? intake.tools),
           stakeholders: strings(primaryRole.stakeholders ?? intake.stakeholders),
           kpis: byKind("kpi"),

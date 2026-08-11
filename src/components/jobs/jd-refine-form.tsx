@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Building2, Check, LoaderCircle, RefreshCw, Save, Sparkles, Target, Users } from "lucide-react";
+import { AlertTriangle, Building2, Check, LoaderCircle, RefreshCw, Save, Sparkles, Target, Users } from "lucide-react";
 import { refineJdDraft, type RefineJdState } from "@/app/(app)/jobs/[id]/edit/actions";
 
 type DraftContent = {
@@ -13,8 +13,11 @@ type DraftContent = {
   mission: string;
   outputs: string[];
   responsibilities: string[];
+  inferredResponsibilities: string[];
   requiredQualifications: string[];
+  inferredRequiredQualifications: string[];
   preferredQualifications: string[];
+  inferredPreferredQualifications: string[];
   tools: string[];
   stakeholders: string[];
   kpis: string[];
@@ -31,6 +34,28 @@ function SectionTitle({ icon, eyebrow, title, text }: { icon: React.ReactNode; e
   return <div className="mb-6 flex gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">{icon}</span><div><p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">{eyebrow}</p><h2 className="mt-1 text-xl font-black text-slate-950">{title}</h2><p className="mt-1 text-sm leading-6 text-slate-500">{text}</p></div></div>;
 }
 
+function InferenceReviewNotice({ items }: { items: string[] }) {
+  if (items.length === 0) return null;
+
+  return (
+    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-amber-800">확인 필요</span>
+            <p className="text-xs font-bold">아래 문장은 회사·팀·NCS에 직접 근거가 없어 AI가 추론했습니다.</p>
+          </div>
+          <ul className="mt-2 space-y-1.5 text-xs leading-5 text-amber-800">
+            {items.map((item, index) => <li key={`${index}-${item}`}>• {item}</li>)}
+          </ul>
+          <p className="mt-2 text-[11px] leading-5 text-amber-700">실제 업무와 맞으면 유지하고, 다르면 위 입력란에서 수정하거나 삭제해 주세요.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function JdRefineForm({ roleId, content }: { roleId: string; content: DraftContent }) {
   const action = refineJdDraft.bind(null, roleId);
   const [state, formAction, pending] = useActionState(action, initialState);
@@ -43,12 +68,12 @@ export function JdRefineForm({ roleId, content }: { roleId: string; content: Dra
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <SectionTitle icon={<Users className="h-5 w-5" />} eyebrow="Role design" title="대표 직무 보완" text="실제 조직에서 사용하는 표현으로 필요한 부분만 수정하세요. Gemini가 회사 프로필과 NCS를 대조해 문장과 근거를 다시 구성합니다." />
-        <div className="space-y-5"><div className="grid gap-5 md:grid-cols-2"><Field label="직무명"><input name="roleTitle" className={inputClass} defaultValue={content.roleTitle} required /></Field><Field label="핵심 산출물" hint="한 줄에 하나씩"><textarea name="outputs" rows={4} className={inputClass} defaultValue={content.outputs.join("\n")} /></Field></div><Field label="직무 미션"><textarea name="mission" rows={4} className={inputClass} defaultValue={content.mission} required /></Field><Field label="주요 책임" hint="한 줄에 하나씩"><textarea name="responsibilities" rows={9} className={inputClass} defaultValue={content.responsibilities.join("\n")} required /></Field></div>
+        <div className="space-y-5"><div className="grid gap-5 md:grid-cols-2"><Field label="직무명"><input name="roleTitle" className={inputClass} defaultValue={content.roleTitle} required /></Field><Field label="핵심 산출물" hint="한 줄에 하나씩"><textarea name="outputs" rows={4} className={inputClass} defaultValue={content.outputs.join("\n")} /></Field></div><Field label="직무 미션"><textarea name="mission" rows={4} className={inputClass} defaultValue={content.mission} required /></Field><Field label="주요 책임" hint="한 줄에 하나씩"><textarea name="responsibilities" rows={9} className={inputClass} defaultValue={content.responsibilities.join("\n")} required /><InferenceReviewNotice items={content.inferredResponsibilities} /></Field></div>
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <SectionTitle icon={<Check className="h-5 w-5" />} eyebrow="Requirements" title="자격요건과 업무 환경" text="학력·연차·자격증은 실제로 필요한 경우에만 남겨 주세요. 자료에서 확인할 수 없는 요건은 Gemini 검토에서 경고하거나 완화합니다." />
-        <div className="grid gap-5 md:grid-cols-2"><Field label="필수 자격요건" hint="한 줄에 하나씩"><textarea name="requiredQualifications" rows={8} className={inputClass} defaultValue={content.requiredQualifications.join("\n")} /></Field><Field label="우대 자격요건" hint="한 줄에 하나씩"><textarea name="preferredQualifications" rows={8} className={inputClass} defaultValue={content.preferredQualifications.join("\n")} /></Field><Field label="사용 도구·필요 지식" hint="선택"><textarea name="tools" rows={6} className={inputClass} defaultValue={content.tools.join("\n")} /></Field><Field label="주요 이해관계자" hint="선택"><textarea name="stakeholders" rows={6} className={inputClass} defaultValue={content.stakeholders.join("\n")} /></Field></div>
+        <div className="grid gap-5 md:grid-cols-2"><Field label="필수 자격요건" hint="한 줄에 하나씩"><textarea name="requiredQualifications" rows={8} className={inputClass} defaultValue={content.requiredQualifications.join("\n")} /><InferenceReviewNotice items={content.inferredRequiredQualifications} /></Field><Field label="우대 자격요건" hint="한 줄에 하나씩"><textarea name="preferredQualifications" rows={8} className={inputClass} defaultValue={content.preferredQualifications.join("\n")} /><InferenceReviewNotice items={content.inferredPreferredQualifications} /></Field><Field label="사용 도구·필요 지식" hint="선택"><textarea name="tools" rows={6} className={inputClass} defaultValue={content.tools.join("\n")} /></Field><Field label="주요 이해관계자" hint="선택"><textarea name="stakeholders" rows={6} className={inputClass} defaultValue={content.stakeholders.join("\n")} /></Field></div>
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
