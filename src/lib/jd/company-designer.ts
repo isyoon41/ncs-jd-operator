@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { stringArray, textValue } from "./company-context";
 import { computeCoverageScore } from "./coverage-score";
+import { discardedNcsCodeFinding, filterAllowedNcsCodes } from "./ncs-code-validation";
 import { rankNcsCandidates } from "./ncs-retrieval";
 import { escapeLikePattern } from "./text-utils";
 
@@ -309,7 +310,12 @@ function parseEncodedPayload(raw: Record<string, unknown>, operation: string): R
   throw new Error(`${operation} 결과의 내부 JSON을 해석하지 못했습니다.`);
 }
 
-function normalizeGroundedItems(value: unknown, allowedCodes: Set<string>, fallback: GroundedItem[]): GroundedItem[] {
+function normalizeGroundedItems(
+  value: unknown,
+  allowedCodes: Set<string>,
+  discardedCodes: Set<string>,
+  fallback: GroundedItem[],
+): GroundedItem[] {
   if (!Array.isArray(value)) return fallback;
   const items = value.flatMap((item): GroundedItem[] => {
     if (!item || typeof item !== "object") return [];
@@ -320,7 +326,7 @@ function normalizeGroundedItems(value: unknown, allowedCodes: Set<string>, fallb
     const basis: GroundedItem["basis"] = ["company", "team_input", "ncs", "ai_inference"].includes(basisValue)
       ? basisValue as GroundedItem["basis"]
       : "ai_inference";
-    return [{ content, ncsCodes: stringArray(record.ncsCodes, 3).filter((code) => allowedCodes.has(code)), basis }];
+    return [{ content, ncsCodes: filterAllowedNcsCodes(record.ncsCodes, allowedCodes, discardedCodes), basis }];
   });
   return items.length > 0 ? items : fallback;
 }
@@ -336,20 +342,29 @@ function normalizeReasoningNotes(value: unknown): ReasoningNotes {
   };
 }
 
+type NormalizedDesign = {
+  design: TeamDesign;
+  discardedNcsCodes: string[];
+};
+
 function normalizeDesign(raw: Record<string, unknown>, input: {
   teamName: string;
   teamRole: string;
   roleTitleHint: string | null;
   candidates: NcsCandidate[];
-}): TeamDesign {
+}): NormalizedDesign {
   const allowedCodes = new Set(input.candidates.map((item) => item.ncsCode));
+  const discardedCodes = new Set<string>();
   const primary = raw.primaryRole && typeof raw.primaryRole === "object" ? raw.primaryRole as Record<string, unknown> : {};
   const fallbackResponsibility: GroundedItem = { content: input.teamRole, ncsCodes: [], basis: "team_input" };
   const mappings = Array.isArray(raw.ncsMappings) ? raw.ncsMappings.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const record = item as Record<string, unknown>;
     const ncsCode = textValue(record.ncsCode);
-    if (!allowedCodes.has(ncsCode)) return [];
+    if (!allowedCodes.has(ncsCode)) {
+      if (ncsCode) discardedCodes.add(ncsCode);
+      return [];
+    }
     const strengthValue = textValue(record.matchStrength);
     const matchStrength: "high" | "medium" | "low" = ["high", "medium", "low"].includes(strengthValue)
       ? strengthValue as "high" | "medium" | "low"
@@ -375,7 +390,7 @@ function normalizeDesign(raw: Record<string, unknown>, input: {
     }] : [];
   }).slice(0, 8) : [];
   const title = textValue(primary.title, input.roleTitleHint ?? `${input.teamName} 담당자`);
-  return {
+  const design: TeamDesign = {
     reasoningNotes: normalizeReasoningNotes(raw.reasoningNotes),
     teamMission: textValue(raw.teamMission, input.teamRole),
     teamOutputs: stringArray(raw.teamOutputs, 8),
@@ -386,15 +401,16 @@ function normalizeDesign(raw: Record<string, unknown>, input: {
       title,
       mission: textValue(primary.mission, input.teamRole),
       outputs: stringArray(primary.outputs, 8),
-      responsibilities: normalizeGroundedItems(primary.responsibilities, allowedCodes, [fallbackResponsibility]),
-      requiredQualifications: normalizeGroundedItems(primary.requiredQualifications, allowedCodes, []),
-      preferredQualifications: normalizeGroundedItems(primary.preferredQualifications, allowedCodes, []),
+      responsibilities: normalizeGroundedItems(primary.responsibilities, allowedCodes, discardedCodes, [fallbackResponsibility]),
+      requiredQualifications: normalizeGroundedItems(primary.requiredQualifications, allowedCodes, discardedCodes, []),
+      preferredQualifications: normalizeGroundedItems(primary.preferredQualifications, allowedCodes, discardedCodes, []),
       tools: stringArray(primary.tools, 10),
       stakeholders: stringArray(primary.stakeholders, 10),
       kpis,
     },
     ncsMappings: mappings,
   };
+  return { design, discardedNcsCodes: [...discardedCodes] };
 }
 
 export async function generateGroundedDesign(input: {
@@ -404,7 +420,7 @@ export async function generateGroundedDesign(input: {
   teamRole: string;
   roleTitleHint: string | null;
   candidates: NcsCandidate[];
-}): Promise<TeamDesign> {
+}): Promise<NormalizedDesign> {
   const prompt = `당신은 한국 스타트업의 조직·직무설계 전문가입니다. 회사와 팀의 최소 정보로 바로 사용할 수 있는 직무기술서 v1.0을 설계하세요.
 
 [회사]
@@ -482,6 +498,7 @@ export async function validateGroundedDesign(input: {
   roleTitleHint: string | null;
   candidates: NcsCandidate[];
   design: TeamDesign;
+  discardedNcsCodes?: string[];
   revisionLabel: "v1.0" | "v1.1";
 }): Promise<ValidationResult> {
   const prompt = `당신은 NCS 근거 직무기술서의 독립 검토자입니다. ${input.revisionLabel} 초안을 검토하고 필요한 수정을 design에 반영하세요.
@@ -529,7 +546,7 @@ ${JSON.stringify(input.design)}
   const status: ValidationResult["status"] = ["passed", "passed_with_notes", "needs_review"].includes(statusValue)
     ? statusValue as ValidationResult["status"]
     : "passed_with_notes";
-  const findings = Array.isArray(raw.findings) ? raw.findings.flatMap((item) => {
+  const modelFindings = Array.isArray(raw.findings) ? raw.findings.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const record = item as Record<string, unknown>;
     const message = textValue(record.message);
@@ -541,12 +558,17 @@ ${JSON.stringify(input.design)}
     return [{ severity, category: textValue(record.category, "일반"), message }];
   }).slice(0, 12) : [];
   const rawDesign = raw.design && typeof raw.design === "object" ? raw.design as Record<string, unknown> : input.design as unknown as Record<string, unknown>;
-  const design = normalizeDesign(rawDesign, input);
+  const normalized = normalizeDesign(rawDesign, input);
+  const codeFinding = discardedNcsCodeFinding([
+    ...(input.discardedNcsCodes ?? []),
+    ...normalized.discardedNcsCodes,
+  ]);
+  const findings = codeFinding ? [codeFinding, ...modelFindings].slice(0, 12) : modelFindings;
   return {
     status,
-    coverageScore: computeCoverageScore(design, findings),
+    coverageScore: computeCoverageScore(normalized.design, findings),
     summary: textValue(raw.summary, "NCS 및 회사 맥락 검토가 완료되었습니다."),
     findings,
-    design,
+    design: normalized.design,
   };
 }

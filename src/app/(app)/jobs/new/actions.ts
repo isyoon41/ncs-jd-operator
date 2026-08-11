@@ -165,7 +165,7 @@ export async function createJdDraft(
 
     const ncsPlan = await planNcsSearch({ company: companyContext, teamName, teamRole, roleTitleHint });
     const candidates = await retrieveNcsCandidates(supabase, ncsPlan);
-    const generatedDesign = await generateGroundedDesign({
+    const generated = await generateGroundedDesign({
       organizationName: organization.name,
       company: companyContext,
       teamName,
@@ -180,7 +180,8 @@ export async function createJdDraft(
       teamRole,
       roleTitleHint,
       candidates,
-      design: generatedDesign,
+      design: generated.design,
+      discardedNcsCodes: generated.discardedNcsCodes,
       revisionLabel: "v1.0",
     });
     const design = validation.design;
