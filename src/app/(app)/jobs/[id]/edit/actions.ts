@@ -14,6 +14,7 @@ import {
   type TeamDesign,
 } from "@/lib/jd/company-designer";
 import { checkAiGenerationRateLimit, recordAiGenerationEvent } from "@/lib/jd/rate-limit";
+import { groundedItemsFromSnapshot, preserveUnchangedGrounding } from "@/lib/jd/refinement";
 import { confidenceForMatchStrength } from "@/lib/jd/text-utils";
 
 export type RefineJdState = { error: string | null };
@@ -41,9 +42,6 @@ function jsonObjects(input: Json | undefined): Array<Record<string, Json | undef
     ? input.filter((item): item is Record<string, Json | undefined> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
     : [];
 }
-
-const grounded = (items: string[]): GroundedItem[] =>
-  items.map((content) => ({ content, ncsCodes: [], basis: "team_input" }));
 
 export async function refineJdDraft(
   roleId: string,
@@ -149,6 +147,10 @@ export async function refineJdDraft(
     const candidates = [...new Map([...retrieved, ...previousCandidates].map((candidate) => [candidate.id, candidate])).values()].slice(0, 60);
 
     const snapshot = jsonRecord(latestVersion.design_snapshot);
+    const previousPrimaryRole = jsonRecord(snapshot.primaryRole ?? null);
+    const previousResponsibilities = groundedItemsFromSnapshot(previousPrimaryRole.responsibilities);
+    const previousRequiredQualifications = groundedItemsFromSnapshot(previousPrimaryRole.requiredQualifications);
+    const previousPreferredQualifications = groundedItemsFromSnapshot(previousPrimaryRole.preferredQualifications);
     const previousSuggestedRoles = jsonObjects(snapshot.suggestedRoles).flatMap((item) => {
       const title = typeof item.title === "string" ? item.title : null;
       const purpose = typeof item.purpose === "string" ? item.purpose : teamRole;
@@ -191,9 +193,9 @@ export async function refineJdDraft(
         title: roleTitle,
         mission,
         outputs,
-        responsibilities: grounded(responsibilities),
-        requiredQualifications: grounded(requiredQualifications),
-        preferredQualifications: grounded(preferredQualifications),
+        responsibilities: preserveUnchangedGrounding(responsibilities, previousResponsibilities),
+        requiredQualifications: preserveUnchangedGrounding(requiredQualifications, previousRequiredQualifications),
+        preferredQualifications: preserveUnchangedGrounding(preferredQualifications, previousPreferredQualifications),
         tools,
         stakeholders,
         kpis: kpiLines.map((name) => ({
