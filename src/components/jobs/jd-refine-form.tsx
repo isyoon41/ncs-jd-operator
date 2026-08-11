@@ -56,7 +56,17 @@ function InferenceReviewNotice({ items }: { items: string[] }) {
   );
 }
 
-export function JdRefineForm({ roleId, content }: { roleId: string; content: DraftContent }) {
+export function JdRefineForm({
+  roleId,
+  content,
+  currentVersionLabel,
+  nextVersionLabel,
+}: {
+  roleId: string;
+  content: DraftContent;
+  currentVersionLabel: string;
+  nextVersionLabel: string;
+}) {
   const action = refineJdDraft.bind(null, roleId);
   const [state, formAction, pending] = useActionState(action, initialState);
   return (
@@ -82,8 +92,8 @@ export function JdRefineForm({ roleId, content }: { roleId: string; content: Dra
       </section>
 
       {state.error && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm leading-6 text-red-700">{state.error}</div>}
-      <div className="flex flex-col gap-4 rounded-3xl bg-slate-950 p-6 text-white sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><RefreshCw className="h-4 w-4 text-blue-300" /><p className="text-sm font-black">NCS 근거 루프를 다시 실행합니다</p></div><p className="mt-2 max-w-xl text-xs leading-5 text-slate-400">회사·팀 맥락, 산업분류, 책임별 근거, 자격요건 환각, KPI 완성도를 재검토하고 기존 v1.0을 보존한 채 v1.1을 만듭니다.</p></div><button type="submit" disabled={pending} className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3.5 text-sm font-bold hover:bg-blue-500 disabled:opacity-60">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{pending ? "Gemini·NCS 재검토 중…" : "검토 후 v1.1 만들기"}</button></div>
-      <p className="flex items-center justify-center gap-2 text-center text-xs leading-5 text-slate-400"><Sparkles className="h-3.5 w-3.5" />입력하지 않은 항목은 v1.0을 유지하거나 회사 맥락에 맞게 보완합니다.</p>
+      <div className="flex flex-col gap-4 rounded-3xl bg-slate-950 p-6 text-white sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><RefreshCw className="h-4 w-4 text-blue-300" /><p className="text-sm font-black">NCS 근거 루프를 다시 실행합니다</p></div><p className="mt-2 max-w-xl text-xs leading-5 text-slate-400">회사·팀 맥락, 산업분류, 책임별 근거, 자격요건 환각, KPI 완성도를 재검토하고 기존 {currentVersionLabel}을 보존한 채 {nextVersionLabel}를 만듭니다.</p></div><button type="submit" disabled={pending} className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3.5 text-sm font-bold hover:bg-blue-500 disabled:opacity-60">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{pending ? "Gemini·NCS 재검토 중…" : `검토 후 ${nextVersionLabel} 만들기`}</button></div>
+      <p className="flex items-center justify-center gap-2 text-center text-xs leading-5 text-slate-400"><Sparkles className="h-3.5 w-3.5" />입력하지 않은 항목은 {currentVersionLabel}의 근거를 유지하거나 회사 맥락에 맞게 보완합니다. 저장 후에도 같은 방식으로 계속 업데이트할 수 있습니다.</p>
     </form>
   );
 }

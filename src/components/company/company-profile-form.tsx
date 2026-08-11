@@ -62,7 +62,7 @@ export function CompanyProfileForm({ organizationId, profile }: { organizationId
       <div className="flex flex-col gap-4 rounded-3xl bg-slate-950 p-6 text-white sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-black">저장하면 새 버전이 만들어집니다</p>
-          <p className="mt-2 max-w-xl text-xs leading-5 text-slate-400">기존 버전은 그대로 보존되고, 이후 새로 만드는 직무설계와 v1.1 보완부터 이 내용이 반영됩니다.</p>
+          <p className="mt-2 max-w-xl text-xs leading-5 text-slate-400">기존 버전은 그대로 보존되고, 이후 새로 만드는 직무설계와 다음 업데이트부터 이 내용이 반영됩니다.</p>
         </div>
         <button type="submit" disabled={pending} className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3.5 text-sm font-bold hover:bg-blue-500 disabled:opacity-60">
           {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

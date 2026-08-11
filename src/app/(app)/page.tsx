@@ -204,7 +204,7 @@ function WorkflowOverview({ disabled = false }: { disabled?: boolean }) {
     { icon: <Building2 className="h-5 w-5" />, title: "회사 이해", text: "소개·IR 자료에서 사업과 전략 맥락을 구조화합니다." },
     { icon: <Network className="h-5 w-5" />, title: "팀 최소 입력", text: "팀명과 팀 역할만 입력해 설계를 시작합니다." },
     { icon: <Database className="h-5 w-5" />, title: "Gemini + NCS", text: "산업 충돌과 문장별 근거를 내부에서 재검토합니다." },
-    { icon: <FileCheck2 className="h-5 w-5" />, title: "v1.0 → v1.1", text: "기준본을 그대로 쓰거나 선택 입력으로 보완합니다." },
+    { icon: <FileCheck2 className="h-5 w-5" />, title: "v1.0 → v1.x", text: "기준본을 보존하며 필요한 만큼 반복 업데이트합니다." },
   ];
   return <section className={`mt-10 ${disabled ? "opacity-55" : ""}`}><div><p className="text-sm font-semibold text-blue-600">Current workflow</p><h2 className="mt-1 text-2xl font-bold text-slate-950">현재 구현된 업무 흐름</h2></div><div className="mt-5 grid gap-4 md:grid-cols-4">{steps.map((step, index) => <div key={step.title} className="relative rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-950 text-white">{step.icon}</span><span className="text-xs font-black text-slate-300">0{index + 1}</span></div><h3 className="mt-5 font-bold text-slate-900">{step.title}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{step.text}</p></div>)}</div></section>;
 }

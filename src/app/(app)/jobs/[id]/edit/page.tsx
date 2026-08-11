@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getOrgContext } from "@/lib/auth/session";
 import type { Json } from "@/lib/supabase/database.types";
 import { groundedItemsFromSnapshot } from "@/lib/jd/refinement";
+import { formatJdVersion, isRefinableJdVersion, nextJdVersion } from "@/lib/jd/versioning";
 import { JdRefineForm } from "@/components/jobs/jd-refine-form";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
@@ -40,7 +41,9 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
     .maybeSingle();
   if (!role || !role.jd_versions[0]) notFound();
   const version = role.jd_versions[0];
-  if (version.version_major === 1 && version.version_minor >= 1) redirect(`/jobs/${id}`);
+  if (!version.organization_profile_id || !isRefinableJdVersion(version)) redirect(`/jobs/${id}`);
+  const currentVersionLabel = formatJdVersion(version);
+  const nextVersionLabel = nextJdVersion(version).label;
 
   const organization = context.organizations.find((item) => item.id === role.teams?.organization_id);
   const canManage = organization ? organization.memberRole !== "member" : false;
@@ -72,20 +75,20 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
     <PageContainer>
       <PageHeader
         backHref={`/jobs/${id}`}
-        backLabel={`v${version.version_major}.${version.version_minor}으로 돌아가기`}
+        backLabel={`${currentVersionLabel}으로 돌아가기`}
         eyebrow="Optional refinement · NCS re-validation"
-        title="직무기술서 v1.1 만들기"
-        description={`${role.teams?.organizations?.name} · ${role.teams?.name} · 자동 생성된 v1.0을 그대로 사용할 수도 있습니다. 회사 고유 정보를 더 반영하고 싶은 항목만 수정하면 Gemini가 NCS 근거를 다시 검토합니다.`}
+        title={`직무기술서 ${nextVersionLabel} 만들기`}
+        description={`${role.teams?.organizations?.name} · ${role.teams?.name} · 현재 ${currentVersionLabel}을 그대로 사용할 수도 있습니다. 더 반영하고 싶은 항목만 수정하면 Gemini가 NCS 근거를 다시 검토합니다.`}
         action={
           <span className="inline-flex shrink-0 items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">
             <Sparkles className="h-3.5 w-3.5" />
-            기존 v1.0은 설계 스냅샷으로 보존됩니다
+            기존 {currentVersionLabel}은 설계 스냅샷으로 보존됩니다
           </span>
         }
       />
-      {hasNewerProfile && <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm leading-6 text-blue-800">회사 프로필이 v{usedProfileVersion} → v{latestOrgProfileVersion}로 업데이트되었습니다. 이번 v1.1 보완에는 최신 프로필이 반영됩니다.</div>}
+      {hasNewerProfile && <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm leading-6 text-blue-800">회사 프로필이 v{usedProfileVersion} → v{latestOrgProfileVersion}로 업데이트되었습니다. 이번 {nextVersionLabel} 보완에는 최신 프로필이 반영됩니다.</div>}
       {canManage ? (
-        <JdRefineForm roleId={id} content={{
+        <JdRefineForm roleId={id} currentVersionLabel={currentVersionLabel} nextVersionLabel={nextVersionLabel} content={{
           teamMission: typeof snapshot.teamMission === "string" ? snapshot.teamMission : role.teams?.mission ?? "",
           teamOutputs: strings(snapshot.teamOutputs ?? teamCharter.outputs),
           teamResponsibilities: strings(snapshot.teamResponsibilities ?? teamCharter.responsibilities),
@@ -106,7 +109,7 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
           <h3 className="font-bold text-slate-800">직무설계 보완 권한이 없습니다</h3>
-          <p className="mt-2 text-sm text-slate-400">v1.1 보완은 관리자만 할 수 있습니다.</p>
+          <p className="mt-2 text-sm text-slate-400">직무기술서 업데이트는 관리자만 할 수 있습니다.</p>
         </div>
       )}
     </PageContainer>

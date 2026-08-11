@@ -16,6 +16,7 @@ import {
 import { checkAiGenerationRateLimit, recordAiGenerationEvent } from "@/lib/jd/rate-limit";
 import { groundedItemsFromSnapshot, preserveUnchangedGrounding } from "@/lib/jd/refinement";
 import { confidenceForMatchStrength } from "@/lib/jd/text-utils";
+import { isRefinableJdVersion, nextJdVersion } from "@/lib/jd/versioning";
 
 export type RefineJdState = { error: string | null };
 
@@ -91,9 +92,8 @@ export async function refineJdDraft(
     .limit(1);
   const latestVersion = versions?.[0];
   if (!latestVersion?.organization_profile_id) return { error: "회사 프로필이 연결된 v1.0부터 보완할 수 있습니다." };
-  if (latestVersion.version_major === 1 && latestVersion.version_minor >= 1) {
-    return { error: "v1.1 검토가 이미 완료되었습니다. 새 직무를 설계하려면 대시보드의 새 직무설계를 이용해 주세요." };
-  }
+  if (!isRefinableJdVersion(latestVersion)) return { error: "새 근거 루프로 생성된 v1.x 직무기술서만 업데이트할 수 있습니다." };
+  const nextVersion = nextJdVersion(latestVersion);
 
   const { data: latestProfiles } = await supabase
     .from("organization_profiles")
@@ -203,7 +203,7 @@ export async function refineJdDraft(
           measure: "회사 내부 데이터로 측정 기준 확정",
           cadence: "회사 운영 주기에 맞춰 확정",
           targetGuide: "현재 기준선을 확인한 뒤 목표 설정",
-          rationale: "사용자가 v1.1 보완 정보로 입력",
+          rationale: `사용자가 ${nextVersion.label} 보완 정보로 입력`,
         })),
       },
       ncsMappings: [...previousMappingDetails.values()],
@@ -216,11 +216,11 @@ export async function refineJdDraft(
       roleTitleHint: roleTitle,
       candidates,
       design: draft,
-      revisionLabel: "v1.1",
+      revisionLabel: nextVersion.label,
     });
     const design = validation.design;
 
-    const nextMinor = latestVersion.version_minor + 1;
+    const nextMinor = nextVersion.versionMinor;
     const { data: newVersion, error: versionError } = await supabase
       .from("jd_versions")
       .insert({
@@ -237,7 +237,7 @@ export async function refineJdDraft(
       })
       .select("id")
       .single();
-    if (versionError) return { error: `v1.${nextMinor} 버전을 만들지 못했습니다: ${versionError.message}` };
+    if (versionError) return { error: `${nextVersion.label} 버전을 만들지 못했습니다: ${versionError.message}` };
 
     const removeVersion = async (message: string) => {
       await supabase.from("jd_versions").delete().eq("id", newVersion.id);
@@ -255,7 +255,7 @@ export async function refineJdDraft(
       .from("jd_sections")
       .insert(sectionRows)
       .select("id, kind, position");
-    if (sectionError) return removeVersion(`v1.${nextMinor} 내용을 저장하지 못했습니다: ${sectionError.message}`);
+    if (sectionError) return removeVersion(`${nextVersion.label} 내용을 저장하지 못했습니다: ${sectionError.message}`);
 
     const candidateByCode = new Map(candidates.map((candidate) => [candidate.ncsCode, candidate]));
     const groundedGroups: Array<{ kind: "responsibility" | "qualification_required" | "qualification_preferred"; items: GroundedItem[] }> = [
@@ -298,7 +298,7 @@ export async function refineJdDraft(
     });
     if (evidenceRows.length > 0) {
       const { error } = await supabase.from("jd_evidence").insert(evidenceRows);
-      if (error) return removeVersion(`v1.${nextMinor} 근거를 저장하지 못했습니다: ${error.message}`);
+      if (error) return removeVersion(`${nextVersion.label} 근거를 저장하지 못했습니다: ${error.message}`);
     }
 
     const mappingRows = design.ncsMappings.flatMap((mapping) => {
@@ -316,7 +316,7 @@ export async function refineJdDraft(
     });
     if (mappingRows.length > 0) {
       const { error } = await supabase.from("role_ncs_mappings").insert(mappingRows);
-      if (error) return removeVersion(`v1.${nextMinor} NCS 매핑을 저장하지 못했습니다: ${error.message}`);
+      if (error) return removeVersion(`${nextVersion.label} NCS 매핑을 저장하지 못했습니다: ${error.message}`);
     }
     const { error: validationError } = await supabase.from("jd_validation_runs").insert({
       jd_version_id: newVersion.id,
@@ -326,7 +326,7 @@ export async function refineJdDraft(
       findings: validation.findings as unknown as Json,
       model: GEMINI_MODEL,
     });
-    if (validationError) return removeVersion(`v1.${nextMinor} 검토 결과를 저장하지 못했습니다: ${validationError.message}`);
+    if (validationError) return removeVersion(`${nextVersion.label} 검토 결과를 저장하지 못했습니다: ${validationError.message}`);
 
     const updatedCharter: Json = {
       ...teamCharter,
@@ -356,7 +356,7 @@ export async function refineJdDraft(
     }).eq("id", roleId);
   } catch (error) {
     const message = error instanceof Error ? error.message : "알 수 없는 오류";
-    return { error: `v1.1 NCS 재검토 중 문제가 발생했습니다: ${message.slice(0, 400)}` };
+    return { error: `${nextVersion.label} NCS 재검토 중 문제가 발생했습니다: ${message.slice(0, 400)}` };
   }
 
   redirect(`/jobs/${roleId}`);

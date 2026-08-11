@@ -88,7 +88,7 @@ export function JdCreateForm({
         </section>
         {state.error && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm leading-6 text-red-700">{state.error}</div>}
         <button type="submit" disabled={pending} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{pending ? "회사·NCS를 분석하는 중…" : "직무기술서 v1.0 만들기"}{!pending && <ArrowRight className="h-4 w-4" />}</button>
-        <p className="text-center text-xs leading-5 text-slate-400">자료의 분량에 따라 약 30~90초가 걸릴 수 있습니다.<br />완성 후 선택 정보를 보완해 v1.1을 만들 수 있습니다.</p>
+        <p className="text-center text-xs leading-5 text-slate-400">자료의 분량에 따라 약 30~90초가 걸릴 수 있습니다.<br />완성 후 선택 정보를 보완해 v1.1, v1.2처럼 계속 업데이트할 수 있습니다.</p>
       </aside>
     </form>
   );

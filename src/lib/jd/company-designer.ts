@@ -499,7 +499,7 @@ export async function validateGroundedDesign(input: {
   candidates: NcsCandidate[];
   design: TeamDesign;
   discardedNcsCodes?: string[];
-  revisionLabel: "v1.0" | "v1.1";
+  revisionLabel: string;
 }): Promise<ValidationResult> {
   const prompt = `당신은 NCS 근거 직무기술서의 독립 검토자입니다. ${input.revisionLabel} 초안을 검토하고 필요한 수정을 design에 반영하세요.
 
