@@ -1,4 +1,5 @@
 import { ShieldCheck } from "lucide-react";
+import { CompanyDesignBasisPanel } from "@/components/company/company-design-basis-panel";
 import type { CompanyContext } from "@/lib/jd/company-designer";
 
 function Item({ label, hint, value }: { label: string; hint?: string; value: string | string[] }) {
@@ -34,6 +35,8 @@ export function CompanyProfileReadonly({ profile }: { profile: CompanyContext })
         <p>회사 프로필 조회 권한만 있습니다. 수정하려면 관리자에게 요청해 주세요.</p>
       </div>
 
+      <CompanyDesignBasisPanel basis={profile.designBasis} validation={profile.basisValidation} />
+
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <h2 className="text-lg font-black text-slate-900">회사 개요</h2>
         <div className="mt-5 space-y-5">
@@ -45,6 +48,7 @@ export function CompanyProfileReadonly({ profile }: { profile: CompanyContext })
             <Item label="성장 단계" value={profile.growthStage} />
           </div>
           <Item label="비즈니스 모델·수익구조" value={profile.businessModel} />
+          <Item label="회사 운영 방식" value={profile.operatingModel} />
         </div>
       </section>
 
@@ -54,6 +58,16 @@ export function CompanyProfileReadonly({ profile }: { profile: CompanyContext })
           <Item label="미션" value={profile.mission} />
           <Item label="비전" value={profile.vision} />
           <Item label="핵심가치" value={profile.coreValues} />
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <h2 className="text-lg font-black text-slate-900">가치사슬·기술·사업 제약</h2>
+        <div className="mt-5 grid gap-5 md:grid-cols-2">
+          <Item label="핵심 가치사슬" value={profile.valueChain} />
+          <Item label="핵심 기술·데이터·보유 자산" value={profile.technologyAssets} />
+          <Item label="차별화 요소" value={profile.differentiators} />
+          <Item label="규제·품질·사업 제약" value={profile.regulatoryConstraints} />
         </div>
       </section>
 

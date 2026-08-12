@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { LoaderCircle, Save } from "lucide-react";
 import { updateCompanyProfile, type UpdateCompanyProfileState } from "@/app/(app)/company/actions";
+import { CompanyDesignBasisPanel } from "@/components/company/company-design-basis-panel";
 import type { CompanyContext } from "@/lib/jd/company-designer";
 
 const initialState: UpdateCompanyProfileState = { error: null };
@@ -24,6 +25,8 @@ export function CompanyProfileForm({ organizationId, profile }: { organizationId
 
   return (
     <form action={formAction} className="space-y-6">
+      <CompanyDesignBasisPanel basis={profile.designBasis} validation={profile.basisValidation} />
+
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <h2 className="text-lg font-black text-slate-900">회사 개요</h2>
         <div className="mt-5 space-y-5">
@@ -35,6 +38,7 @@ export function CompanyProfileForm({ organizationId, profile }: { organizationId
             <Field label="성장 단계"><input name="growthStage" className={inputClass} defaultValue={profile.growthStage} /></Field>
           </div>
           <Field label="비즈니스 모델·수익구조"><textarea name="businessModel" rows={3} className={inputClass} defaultValue={profile.businessModel} /></Field>
+          <Field label="회사 운영 방식" hint="한 줄에 하나씩 · 예: 프로젝트형 조직, 연구개발 중심"><textarea name="operatingModel" rows={3} className={inputClass} defaultValue={profile.operatingModel.join("\n")} /></Field>
         </div>
       </section>
 
@@ -45,6 +49,17 @@ export function CompanyProfileForm({ organizationId, profile }: { organizationId
           <Field label="미션" hint="이 회사가 존재하는 이유"><textarea name="mission" rows={3} className={inputClass} defaultValue={profile.mission} required /></Field>
           <Field label="비전" hint="이 회사가 지향하는 미래"><textarea name="vision" rows={3} className={inputClass} defaultValue={profile.vision} /></Field>
           <Field label="핵심가치" hint="한 줄에 하나씩"><textarea name="coreValues" rows={3} className={inputClass} defaultValue={profile.coreValues.join("\n")} /></Field>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <h2 className="text-lg font-black text-slate-900">가치사슬·기술·사업 제약</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-500">실제 직무의 책임과 필요한 역량을 회사에 맞게 결정하는 핵심 정보입니다. 확인되는 내용만 구체적으로 적어 주세요.</p>
+        <div className="mt-5 grid gap-5 md:grid-cols-2">
+          <Field label="핵심 가치사슬" hint="한 줄에 하나씩 · 고객 가치가 만들어지는 순서"><textarea name="valueChain" rows={5} className={inputClass} defaultValue={profile.valueChain.join("\n")} placeholder="고객 요구 발굴\n솔루션 설계·검증\n납품·운영 지원" /></Field>
+          <Field label="핵심 기술·데이터·보유 자산" hint="한 줄에 하나씩"><textarea name="technologyAssets" rows={5} className={inputClass} defaultValue={profile.technologyAssets.join("\n")} /></Field>
+          <Field label="차별화 요소" hint="한 줄에 하나씩"><textarea name="differentiators" rows={5} className={inputClass} defaultValue={profile.differentiators.join("\n")} /></Field>
+          <Field label="규제·품질·사업 제약" hint="한 줄에 하나씩"><textarea name="regulatoryConstraints" rows={5} className={inputClass} defaultValue={profile.regulatoryConstraints.join("\n")} /></Field>
         </div>
       </section>
 
@@ -61,12 +76,12 @@ export function CompanyProfileForm({ organizationId, profile }: { organizationId
       {state.error && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm leading-6 text-red-700">{state.error}</div>}
       <div className="flex flex-col gap-4 rounded-3xl bg-slate-950 p-6 text-white sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-black">저장하면 새 버전이 만들어집니다</p>
-          <p className="mt-2 max-w-xl text-xs leading-5 text-slate-400">기존 버전은 그대로 보존되고, 이후 새로 만드는 직무설계와 다음 업데이트부터 이 내용이 반영됩니다.</p>
+          <p className="text-sm font-black">저장하면 회사 기준점을 다시 설계하고 검토합니다</p>
+          <p className="mt-2 max-w-xl text-xs leading-5 text-slate-400">입력값을 확인된 회사 사실로 취급합니다. Gemini가 가치 창출 논리·핵심 역량·직무설계 가드레일을 재구성하고 독립 검토한 뒤 새 버전으로 저장합니다.</p>
         </div>
         <button type="submit" disabled={pending} className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3.5 text-sm font-bold hover:bg-blue-500 disabled:opacity-60">
           {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          {pending ? "저장 중…" : "새 버전으로 저장"}
+          {pending ? "회사 기준점 검토 중…" : "기준점 재검증·저장"}
         </button>
       </div>
     </form>

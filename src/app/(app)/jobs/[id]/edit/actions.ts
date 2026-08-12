@@ -6,13 +6,14 @@ import type { Json } from "@/lib/supabase/database.types";
 import {
   GEMINI_MODEL,
   planNcsSearch,
+  refreshCompanyDesignBasis,
   retrieveNcsCandidates,
   validateGroundedDesign,
-  type CompanyContext,
   type GroundedItem,
   type NcsCandidate,
   type TeamDesign,
 } from "@/lib/jd/company-designer";
+import { hasCompanyDesignBasis, normalizeCompanyContext } from "@/lib/jd/company-context";
 import { checkAiGenerationRateLimit, recordAiGenerationEvent } from "@/lib/jd/rate-limit";
 import { groundedItemsFromSnapshot, preserveUnchangedGrounding } from "@/lib/jd/refinement";
 import { confidenceForMatchStrength } from "@/lib/jd/text-utils";
@@ -97,14 +98,14 @@ export async function refineJdDraft(
 
   const { data: latestProfiles } = await supabase
     .from("organization_profiles")
-    .select("id, structured_context")
+    .select("id, version_no, structured_context, source_ids")
     .eq("organization_id", role.teams.organization_id)
     .order("version_no", { ascending: false })
     .limit(1);
   const profile = latestProfiles?.[0];
   if (!profile) return { error: "직무설계에 사용한 회사 프로필을 찾을 수 없습니다." };
-  const company = profile.structured_context as unknown as CompanyContext;
-  const activeProfileId = profile.id;
+  let company = normalizeCompanyContext(profile.structured_context);
+  let activeProfileId = profile.id;
   const intake = jsonRecord(role.intake);
   const teamCharter = jsonRecord(role.teams.charter);
   const teamRole = typeof intake.teamRole === "string"
@@ -115,6 +116,28 @@ export async function refineJdDraft(
 
   try {
     await recordAiGenerationEvent(supabase, role.teams.organization_id, user.id, "refine");
+
+    if (!hasCompanyDesignBasis(company)) {
+      company = await refreshCompanyDesignBasis({
+        organizationName: role.teams.organizations.name,
+        company,
+      });
+      const { data: upgradedProfile, error: profileError } = await supabase
+        .from("organization_profiles")
+        .insert({
+          organization_id: role.teams.organization_id,
+          version_no: profile.version_no + 1,
+          summary: company.summary,
+          structured_context: company as unknown as Json,
+          source_ids: profile.source_ids,
+          model: GEMINI_MODEL,
+          created_by: user.id,
+        })
+        .select("id")
+        .single();
+      if (profileError) return { error: `회사 직무설계 기준점을 저장하지 못했습니다: ${profileError.message}` };
+      activeProfileId = upgradedProfile.id;
+    }
 
     const additionalContext = [teamMission, ...teamOutputs, ...teamResponsibilities, mission, ...outputs, ...responsibilities, ...requiredQualifications, ...preferredQualifications, ...tools, ...stakeholders].join("\n");
     const plan = await planNcsSearch({
@@ -217,6 +240,7 @@ export async function refineJdDraft(
       candidates,
       design: draft,
       revisionLabel: nextVersion.label,
+      ncsPlan: plan,
     });
     const design = validation.design;
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeCompanyContext } from "./company-context";
+import { hasCompanyDesignBasis, normalizeCompanyContext } from "./company-context";
 
 // 배열 필드는 전부 화면에서 .join()으로 렌더된다. 하나라도 undefined면 페이지가 죽으므로
 // 어떤 입력이 와도 배열이 보장되는지가 이 테스트의 핵심이다.
@@ -10,6 +10,10 @@ const ARRAY_FIELDS = [
   "customers",
   "strategicPriorities",
   "culture",
+  "valueChain",
+  "technologyAssets",
+  "regulatoryConstraints",
+  "differentiators",
   "keyTerms",
   "uncertainties",
 ] as const;
@@ -43,5 +47,30 @@ describe("normalizeCompanyContext", () => {
     expect(normalizeCompanyContext({ mvcBasis: "stated" }).mvcBasis).toBe("stated");
     expect(normalizeCompanyContext({ mvcBasis: "guessed" }).mvcBasis).toBe("inferred");
     expect(normalizeCompanyContext({}).mvcBasis).toBe("inferred");
+  });
+
+  it("normalizes nested design-basis and review fields from JSON", () => {
+    const profile = normalizeCompanyContext({
+      designBasis: {
+        valueCreationLogic: "고객 과제를 기술 솔루션으로 전환한다.",
+        criticalCapabilities: ["기술 제안", null, "  고객 검증  "],
+        roleDesignGuardrails: ["규제 검토를 책임에 포함한다"],
+      },
+      basisValidation: {
+        status: "ready",
+        summary: "회사 사실과 일치함",
+        findings: [{ severity: "warning", message: "  일부 시장 정보는 확인 필요  " }],
+      },
+    });
+
+    expect(profile.designBasis.criticalCapabilities).toEqual(["기술 제안", "고객 검증"]);
+    expect(profile.basisValidation.status).toBe("ready");
+    expect(profile.basisValidation.findings).toEqual([{ severity: "warning", message: "일부 시장 정보는 확인 필요" }]);
+    expect(hasCompanyDesignBasis(profile)).toBe(true);
+  });
+
+  it("does not treat a partial legacy basis as ready for job design", () => {
+    const profile = normalizeCompanyContext({ designBasis: { valueCreationLogic: "가치 창출" } });
+    expect(hasCompanyDesignBasis(profile)).toBe(false);
   });
 });

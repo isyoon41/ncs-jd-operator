@@ -9,6 +9,8 @@ import { normalizeCompanyContext } from "@/lib/jd/company-context";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
 
+export const maxDuration = 300;
+
 export default async function CompanyProfilePage() {
   const context = await getOrgContext();
   if (!context) redirect("/login?next=/company");
@@ -33,7 +35,7 @@ export default async function CompanyProfilePage() {
         backHref="/"
         eyebrow="Company profile"
         title={`${organization.name} 회사 프로필`}
-        description={latestProfile ? `현재 v${latestProfile.version_no} · 저장하면 새 버전이 만들어집니다.` : undefined}
+        description={latestProfile ? `현재 v${latestProfile.version_no} · 회사 사실을 보완하면 Gemini가 JD 설계 기준점을 다시 만들고 검토합니다.` : undefined}
         action={
           organizations.length > 1 ? (
             <p className="shrink-0 text-xs text-slate-400">헤더의 회사 전환으로 다른 회사를 선택할 수 있습니다.</p>

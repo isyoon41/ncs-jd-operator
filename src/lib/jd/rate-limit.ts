@@ -31,13 +31,13 @@ export async function checkAiGenerationRateLimit(
   if ((userCount ?? 0) >= USER_HOURLY_LIMIT) {
     return {
       allowed: false,
-      message: `AI 직무설계는 1인당 시간당 ${USER_HOURLY_LIMIT}건까지 만들 수 있습니다. 잠시 후 다시 시도해 주세요.`,
+      message: `Google AI 분석은 1인당 시간당 ${USER_HOURLY_LIMIT}건까지 실행할 수 있습니다. 잠시 후 다시 시도해 주세요.`,
     };
   }
   if ((orgCount ?? 0) >= ORG_DAILY_LIMIT) {
     return {
       allowed: false,
-      message: `이 회사는 하루 ${ORG_DAILY_LIMIT}건까지 AI 직무설계를 만들 수 있습니다. 내일 다시 시도해 주세요.`,
+      message: `이 회사는 하루 ${ORG_DAILY_LIMIT}건까지 Google AI 분석을 실행할 수 있습니다. 내일 다시 시도해 주세요.`,
     };
   }
   return { allowed: true };

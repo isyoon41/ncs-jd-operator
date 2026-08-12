@@ -18,7 +18,13 @@ import {
 import { createJdDraft, type CreateJdState } from "@/app/(app)/jobs/new/actions";
 
 type Organization = { id: string; name: string };
-type CompanyProfile = { organization_id: string; version_no: number; summary: string };
+type CompanyProfile = {
+  organization_id: string;
+  version_no: number;
+  summary: string;
+  hasDesignBasis: boolean;
+  basisStatus: "ready" | "needs_review";
+};
 
 const initialState: CreateJdState = { error: null };
 const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10";
@@ -52,7 +58,7 @@ export function JdCreateForm({
           <StepTitle number="01" eyebrow="Company context" icon={<Building2 className="h-5 w-5" />} title="Gemini가 회사를 먼저 이해합니다" text="회사 소개를 직접 입력하거나 IR·회사소개 자료를 올려 주세요. 확인 가능한 사실만 회사 프로필로 구조화해 이후 모든 팀과 직무설계에 재사용합니다." />
           <div className="space-y-5">
             <Field label="회사"><select name="organizationId" value={organizationId} onChange={(event) => { setOrganizationId(event.target.value); setShowNewSource(false); }} className={inputClass} required>{organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}</select></Field>
-            {currentProfile && <div className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><div><p className="text-sm font-bold text-emerald-950">회사 프로필 v{currentProfile.version_no}이 준비되어 있습니다</p><p className="mt-1 text-xs leading-5 text-emerald-700">{currentProfile.summary}</p><p className="mt-2 text-xs font-semibold text-emerald-700">별도 입력 없이 이 프로필을 그대로 사용해 바로 진행할 수 있습니다.</p><Link href="/company" className="mt-2 inline-block text-xs font-bold text-emerald-700 underline">프로필 직접 수정하기</Link></div></div>}
+            {currentProfile && <div className={`flex gap-3 rounded-2xl border p-4 ${currentProfile.hasDesignBasis && currentProfile.basisStatus === "ready" ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}><Check className={`mt-0.5 h-5 w-5 shrink-0 ${currentProfile.hasDesignBasis && currentProfile.basisStatus === "ready" ? "text-emerald-600" : "text-amber-600"}`} /><div><p className={`text-sm font-bold ${currentProfile.hasDesignBasis && currentProfile.basisStatus === "ready" ? "text-emerald-950" : "text-amber-950"}`}>회사 프로필 v{currentProfile.version_no}이 준비되어 있습니다</p><p className={`mt-1 text-xs leading-5 ${currentProfile.hasDesignBasis && currentProfile.basisStatus === "ready" ? "text-emerald-700" : "text-amber-800"}`}>{currentProfile.summary}</p><p className={`mt-2 text-xs font-semibold ${currentProfile.hasDesignBasis && currentProfile.basisStatus === "ready" ? "text-emerald-700" : "text-amber-800"}`}>{currentProfile.hasDesignBasis ? (currentProfile.basisStatus === "ready" ? "회사 직무설계 기준점까지 AI 검토가 완료되었습니다." : "회사 기준점에 사람 확인이 필요한 항목이 있습니다.") : "이전 형식의 프로필입니다. 생성 시 회사 기준점을 자동으로 보강합니다."}</p><Link href="/company" className={`mt-2 inline-block text-xs font-bold underline ${currentProfile.hasDesignBasis && currentProfile.basisStatus === "ready" ? "text-emerald-700" : "text-amber-800"}`}>프로필과 기준점 확인하기</Link></div></div>}
             {currentProfile && !showNewSource ? (
               <button type="button" onClick={() => setShowNewSource(true)} className="text-sm font-bold text-blue-600 hover:text-blue-700">다른 자료로 새 프로필 만들기</button>
             ) : (
@@ -82,13 +88,13 @@ export function JdCreateForm({
           <div className="flex items-center gap-2 text-blue-300"><BrainCircuit className="h-5 w-5" /><p className="text-xs font-bold uppercase tracking-[0.18em]">Gemini + NCS design loop</p></div>
           <h2 className="mt-4 text-xl font-bold">직무기술서 v1.0 자동 설계</h2>
           <div className="mt-5 space-y-4">
-            {[{ icon: <FileText className="h-4 w-4" />, title: "회사 이해", text: "사업·고객·제품·전략을 구조화" }, { icon: <Database className="h-4 w-4" />, title: "NCS 내부 탐색", text: "산업분류와 과업을 의미 기반으로 검토" }, { icon: <Sparkles className="h-4 w-4" />, title: "직무설계", text: "팀 미션부터 책임·자격·KPI까지 생성" }, { icon: <ShieldCheck className="h-4 w-4" />, title: "독립 검토", text: "산업 충돌·환각·근거 누락을 재검사" }].map((item) => <div key={item.title} className="flex gap-3"><span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/10 text-blue-300">{item.icon}</span><div><p className="text-sm font-bold">{item.title}</p><p className="mt-1 text-xs leading-5 text-slate-400">{item.text}</p></div></div>)}
+            {[{ icon: <FileText className="h-4 w-4" />, title: "회사 사실 추출", text: "사업·고객·가치사슬·기술·제약을 구분" }, { icon: <BrainCircuit className="h-4 w-4" />, title: "회사 기준점 설계", text: "가치 창출 논리·핵심 역량·가드레일 확정" }, { icon: <Network className="h-4 w-4" />, title: "팀 맥락 연결", text: "회사의 기준점 중 이번 팀에 필요한 부분만 선별" }, { icon: <Database className="h-4 w-4" />, title: "NCS 근거 탐색", text: "표준 과업을 찾되 회사 고유 책임은 억지 매핑하지 않음" }, { icon: <ShieldCheck className="h-4 w-4" />, title: "독립 검토", text: "회사 적합성·NCS 근거·환각을 재검사" }].map((item) => <div key={item.title} className="flex gap-3"><span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/10 text-blue-300">{item.icon}</span><div><p className="text-sm font-bold">{item.title}</p><p className="mt-1 text-xs leading-5 text-slate-400">{item.text}</p></div></div>)}
           </div>
           <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4"><p className="text-xs font-bold text-emerald-300">사용자가 NCS를 고르지 않습니다</p><p className="mt-2 text-xs leading-5 text-slate-400">시스템이 내부에서 적합성을 판단하고 최종 보고서에서 각 문장이 왜 생성됐는지 설명합니다.</p></div>
         </section>
         {state.error && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm leading-6 text-red-700">{state.error}</div>}
         <button type="submit" disabled={pending} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{pending ? "회사·NCS를 분석하는 중…" : "직무기술서 v1.0 만들기"}{!pending && <ArrowRight className="h-4 w-4" />}</button>
-        <p className="text-center text-xs leading-5 text-slate-400">자료의 분량에 따라 약 30~90초가 걸릴 수 있습니다.<br />완성 후 선택 정보를 보완해 v1.1, v1.2처럼 계속 업데이트할 수 있습니다.</p>
+        <p className="text-center text-xs leading-5 text-slate-400">새 회사 자료를 분석할 때는 약 60~180초가 걸릴 수 있습니다.<br />완성 후 선택 정보를 보완해 v1.1, v1.2처럼 계속 업데이트할 수 있습니다.</p>
       </aside>
     </form>
   );

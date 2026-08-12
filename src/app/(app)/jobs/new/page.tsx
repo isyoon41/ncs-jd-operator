@@ -4,6 +4,7 @@ import { getOrgContext } from "@/lib/auth/session";
 import { JdCreateForm } from "@/components/jobs/jd-create-form";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
+import { hasCompanyDesignBasis, normalizeCompanyContext } from "@/lib/jd/company-context";
 
 export const maxDuration = 300;
 
@@ -20,11 +21,28 @@ export default async function NewJobPage() {
   const { data: profileRows } = manageableOrganizations.length
     ? await supabase
         .from("organization_profiles")
-        .select("organization_id, version_no, summary")
+        .select("organization_id, version_no, summary, structured_context")
         .in("organization_id", manageableOrganizations.map((organization) => organization.id))
         .order("version_no", { ascending: false })
     : { data: [] };
-  const profiles = [...new Map((profileRows ?? []).map((profile) => [profile.organization_id, profile])).values()];
+  const profileByOrganization = new Map<string, NonNullable<typeof profileRows>[number]>();
+  for (const profile of profileRows ?? []) {
+    // version_no 내림차순이므로 회사별 첫 행이 최신 버전이다. 뒤의 과거 버전으로 덮어쓰지 않는다.
+    if (!profileByOrganization.has(profile.organization_id)) {
+      profileByOrganization.set(profile.organization_id, profile);
+    }
+  }
+  const latestProfiles = [...profileByOrganization.values()];
+  const profiles = latestProfiles.map((profile) => {
+    const context = normalizeCompanyContext(profile.structured_context);
+    return {
+      organization_id: profile.organization_id,
+      version_no: profile.version_no,
+      summary: profile.summary,
+      hasDesignBasis: hasCompanyDesignBasis(context),
+      basisStatus: context.basisValidation.status,
+    };
+  });
   const defaultOrganizationId = manageableOrganizations.some((organization) => organization.id === activeOrgId)
     ? activeOrgId
     : undefined;

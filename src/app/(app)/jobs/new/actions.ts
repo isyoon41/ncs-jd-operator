@@ -8,11 +8,13 @@ import {
   analyzeCompanyContext,
   generateGroundedDesign,
   planNcsSearch,
+  refreshCompanyDesignBasis,
   retrieveNcsCandidates,
   validateGroundedDesign,
   type CompanyContext,
   type GroundedItem,
 } from "@/lib/jd/company-designer";
+import { hasCompanyDesignBasis, normalizeCompanyContext } from "@/lib/jd/company-context";
 import { checkAiGenerationRateLimit, recordAiGenerationEvent } from "@/lib/jd/rate-limit";
 import { confidenceForMatchStrength, escapeLikePattern, safeFileName } from "@/lib/jd/text-utils";
 
@@ -67,7 +69,7 @@ export async function createJdDraft(
 
   const { data: latestProfiles } = await supabase
     .from("organization_profiles")
-    .select("id, version_no, summary, structured_context")
+    .select("id, version_no, summary, structured_context, source_ids")
     .eq("organization_id", organizationId)
     .order("version_no", { ascending: false })
     .limit(1);
@@ -160,7 +162,29 @@ export async function createJdDraft(
       profileId = profile.id;
       createdProfileId = profile.id;
     } else {
-      companyContext = latestProfile!.structured_context as unknown as CompanyContext;
+      companyContext = normalizeCompanyContext(latestProfile!.structured_context);
+      if (!hasCompanyDesignBasis(companyContext)) {
+        companyContext = await refreshCompanyDesignBasis({
+          organizationName: organization.name,
+          company: companyContext,
+        });
+        const { data: upgradedProfile, error: profileError } = await supabase
+          .from("organization_profiles")
+          .insert({
+            organization_id: organizationId,
+            version_no: latestProfile!.version_no + 1,
+            summary: companyContext.summary,
+            structured_context: companyContext as unknown as Json,
+            source_ids: latestProfile!.source_ids,
+            model: GEMINI_MODEL,
+            created_by: user.id,
+          })
+          .select("id")
+          .single();
+        if (profileError) return { error: `회사 직무설계 기준점을 저장하지 못했습니다: ${profileError.message}` };
+        profileId = upgradedProfile.id;
+        createdProfileId = upgradedProfile.id;
+      }
     }
 
     const ncsPlan = await planNcsSearch({ company: companyContext, teamName, teamRole, roleTitleHint });
@@ -172,6 +196,7 @@ export async function createJdDraft(
       teamRole,
       roleTitleHint,
       candidates,
+      ncsPlan,
     });
     const validation = await validateGroundedDesign({
       organizationName: organization.name,
@@ -183,6 +208,7 @@ export async function createJdDraft(
       design: generated.design,
       discardedNcsCodes: generated.discardedNcsCodes,
       revisionLabel: "v1.0",
+      ncsPlan,
     });
     const design = validation.design;
 
